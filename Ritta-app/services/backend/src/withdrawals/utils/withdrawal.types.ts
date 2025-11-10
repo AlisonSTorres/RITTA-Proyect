@@ -146,6 +146,7 @@ export interface ProcessWithdrawalData {
  */
 export interface ManualAuthorizationRequestDto {
   studentId: number;
+  approverId?: number;
   reasonId: number;
   customReason?: string;
   delegateId?: number;
@@ -177,11 +178,11 @@ export interface ManualAuthorizationResponseDto {
  * DTO para filtros de historial
  */
 export interface HistoryFiltersDto {
-  studentId?: number;
+   studentId?: number;
   studentRut?: string;
   status?: string;
   method?: string;
-  approverId?: number;
+  approverId?: number; 
   startDate?: Date;
   endDate?: Date;
   limit?: number;
@@ -271,4 +272,69 @@ export interface WithdrawalReasonDto {
   name: string;
   description?: string;
   isActive?: boolean;
+}
+
+export type ManualApprovalAction = 'APPROVE' | 'DENY';
+
+export interface ManualApprovalDelegateDto {
+  id?: number | null;
+  name: string;
+  phone?: string | null;
+  rut?: string | null;
+  relationshipToStudent?: string | null;
+}
+
+export interface PendingManualApprovalDto {
+  id: number;
+  requestedAt: Date;
+  notes?: string;
+  student: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    rut: string;
+    courseName?: string;
+  };
+  delegate: ManualApprovalDelegateDto;
+  reason: {
+    id: number;
+    name: string;
+    customReason?: string | null;
+  };
+  inspector?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export interface InspectorManualApprovalDto {
+  id: number;
+  requestedAt: Date;
+  notes?: string;
+  student: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    rut: string;
+    courseName?: string;
+  };
+  delegate: ManualApprovalDelegateDto;
+  reason: {
+    id: number;
+    name: string;
+    customReason?: string | null;
+  };
+  guardian?: {
+    id: number;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export interface ManualApprovalResolutionDto {
+  id: number;
+  status: WithdrawalStatus;
+  contactVerified: boolean;
+  notes?: string;
 }

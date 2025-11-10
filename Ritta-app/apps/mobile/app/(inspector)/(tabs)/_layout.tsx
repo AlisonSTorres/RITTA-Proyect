@@ -118,7 +118,21 @@ export default function TabLayout() {
         />
 
         <Tabs.Screen
+          name="notificaciones"
+          options={{
+            href: null,
+          }}
+        />
+
+        <Tabs.Screen
           name="seleccionHistorialRetiros"
+          options={{
+            href: null,
+          }}
+        />
+
+        <Tabs.Screen
+          name="notificaciones"
           options={{
             href: null,
           }}

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import WithdrawalService from '../services/withdrawal.service';
 import QrAuthorizationService from '../services/qr_authorization.service';
-import { ValidateQrRequestDto, ManualWithdrawalRequestDto } from '../utils/withdrawal.types';
+import { ValidateQrRequestDto, ManualWithdrawalRequestDto, ManualApprovalAction } from '../utils/withdrawal.types';
 import Student from '../../models/Student';
 import User from '../../models/User';
 import Delegate from '../../models/Delegate';
@@ -174,6 +174,100 @@ export class InspectorWithdrawalController {
     }
   }
   
+  /**
+   * Solicitudes confirmadas pendientes de finalización por el inspector
+   * GET /api/withdrawals/inspector/pending-approvals
+   */
+  async getPendingManualApprovals(req: Request, res: Response): Promise<void> {
+    try {
+      const inspectorUserId = req.user?.id;
+
+      if (!inspectorUserId) {
+        res.status(401).json({
+          success: false,
+          message: 'Usuario no autenticado'
+        });
+        return;
+      }
+
+      const approvals = await WithdrawalService.getInspectorConfirmedManualApprovals(inspectorUserId);
+
+      res.status(200).json({
+        success: true,
+        data: approvals,
+        message: 'Solicitudes confirmadas obtenidas exitosamente'
+      });
+    } catch (error) {
+      console.error('Error obteniendo solicitudes confirmadas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  }
+
+  /**
+   * Resolver solicitud confirmada por apoderado
+   * POST /api/withdrawals/inspector/pending-approvals/:withdrawalId/decision
+   */
+  async resolvePendingManualApproval(req: Request, res: Response): Promise<void> {
+    try {
+      const inspectorUserId = req.user?.id;
+      const withdrawalId = parseInt(req.params.withdrawalId, 10);
+      const { action, comment } = req.body as { action: ManualApprovalAction; comment?: string };
+
+      if (!inspectorUserId) {
+        res.status(401).json({
+          success: false,
+          message: 'Usuario no autenticado'
+        });
+        return;
+      }
+
+      if (Number.isNaN(withdrawalId)) {
+        res.status(400).json({
+          success: false,
+          message: 'ID de retiro inválido'
+        });
+        return;
+      }
+
+      if (!['APPROVE', 'DENY'].includes(action)) {
+        res.status(400).json({
+          success: false,
+          message: 'Acción inválida. Debe ser APPROVE o DENY'
+        });
+        return;
+      }
+
+      const result = await WithdrawalService.finalizeInspectorManualApproval({
+        inspectorUserId,
+        withdrawalId,
+        action,
+        comment
+      });
+
+      const message = action === 'APPROVE'
+        ? 'Retiro autorizado exitosamente'
+        : 'Solicitud rechazada exitosamente';
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message
+      });
+    } catch (error: any) {
+      console.error('Error resolviendo solicitud confirmada:', error);
+      const message = error?.message || 'Error interno del servidor';
+
+      if (message.toLowerCase().includes('no encontrada')) {
+        res.status(404).json({ success: false, message });
+        return;
+      }
+
+      res.status(400).json({ success: false, message });
+    }
+  }
   /**
    * Procesar retiro manual (método original)
    * POST /api/withdrawals/inspector/manual
@@ -364,18 +458,21 @@ export class InspectorWithdrawalController {
           {
             model: User,
             as: 'parent',
-            attributes: ['id', 'rut', 'firstName', 'lastName', 'phone']
+            attributes: ['id', 'rut', 'firstName', 'lastName', 'phone'],
+            include: [
+              {
+                model: Delegate,
+                as: 'delegates',
+                attributes: ['id', 'name', 'phone', 'relationshipToStudent'],
+                separate: true,
+                order: [['name', 'ASC']]
+              }
+            ]
           },
           {
             model: Course,
             as: 'course',
             attributes: ['id', 'name']
-          },
-          {     
-            model: Delegate,
-            as: 'delegates',
-            attributes: ['id','name','phone','relationshipToStudent'],
-            order: [['name','ASC']]
           }
         ]
       }); 

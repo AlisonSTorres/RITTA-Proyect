@@ -9,7 +9,9 @@ import {
   manualWithdrawalSchema,
   getHistorySchema,
   searchStudentSchema,
-  getStatsSchema 
+  getStatsSchema,
+  getInspectorPendingApprovalsSchema,
+  resolveInspectorPendingApprovalSchema 
 } from '../validators/inspector_withdrawal.validators';
 
 const router = Router();
@@ -23,6 +25,8 @@ router.get('/stats', validate(getStatsSchema), InspectorWithdrawalController.get
 router.get('/history', validate(getHistorySchema), InspectorWithdrawalController.getWithdrawalHistory);
 router.post('/qr/process', validate(processQrSchema), InspectorWithdrawalController.processQrDecision);
 router.post('/authorize-manual', validate(manualAuthorizationSchema), InspectorWithdrawalController.authorizeManually);
+router.get('/pending-approvals', validate(getInspectorPendingApprovalsSchema), InspectorWithdrawalController.getPendingManualApprovals);
+router.post('/pending-approvals/:withdrawalId/decision', validate(resolveInspectorPendingApprovalSchema), InspectorWithdrawalController.resolvePendingManualApproval);
 router.post('/manual', validate(manualWithdrawalSchema), InspectorWithdrawalController.processManualWithdrawal);
 
 export default router;

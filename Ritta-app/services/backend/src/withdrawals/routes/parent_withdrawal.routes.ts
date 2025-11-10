@@ -9,7 +9,9 @@ import {
   resendQrSchema,
   getStudentHistorySchema,
   getStatsSchema,
-  cancelQrSchema 
+  cancelQrSchema,
+  getPendingApprovalsSchema,
+  resolvePendingApprovalSchema 
 } from '../validators/parent_withdrawal.validators';
 
 const router = Router();
@@ -23,9 +25,11 @@ router.get('/reasons', ParentWithdrawalController.getWithdrawalReasons);
 router.get('/stats', validate(getStatsSchema), ParentWithdrawalController.getMyStats);
 router.get('/active-qrs', validate(getActiveQrsSchema), ParentWithdrawalController.getMyActiveQrs);
 router.get('/history', validate(getHistorySchema), ParentWithdrawalController.getMyWithdrawalHistory);
+router.get('/pending-approvals', validate(getPendingApprovalsSchema), ParentWithdrawalController.getPendingApprovals);
 router.get('/students/:studentId/history', validate(getStudentHistorySchema), ParentWithdrawalController.getStudentHistory);
 router.post('/generate-qr', validate(generateQrSchema), ParentWithdrawalController.generateQrCode);
 router.post('/students/:studentId/resend-qr', validate(resendQrSchema), ParentWithdrawalController.resendActiveQr);
+router.post('/pending-approvals/:withdrawalId/decision', validate(resolvePendingApprovalSchema), ParentWithdrawalController.resolvePendingApproval);
 router.delete('/qr/:identifier/cancel', validate(cancelQrSchema), ParentWithdrawalController.cancelActiveQr);
 
 export default router;

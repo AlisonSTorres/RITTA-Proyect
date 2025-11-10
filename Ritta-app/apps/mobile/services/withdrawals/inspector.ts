@@ -136,3 +136,34 @@ export const fetchInspectorWithdrawalHistory = async (filters: {
 
   return json.data;
 };
+
+export const fetchInspectorPendingApprovals = async () => {
+  const response = await fetch(`${API_BASE_URL}/withdrawals/inspector/pending-approvals`, {
+    method: 'GET',
+    headers: await getAuthHeaders(),
+  });
+
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Error al obtener solicitudes confirmadas');
+  return json.data;
+};
+
+
+export const resolveInspectorPendingApproval = async (
+  withdrawalId: number,
+  action: 'APPROVE' | 'DENY',
+  comment?: string,
+) => {
+  const response = await fetch(
+    `${API_BASE_URL}/withdrawals/inspector/pending-approvals/${withdrawalId}/decision`,
+    {
+      method: 'POST',
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action, comment }),
+    },
+  );
+
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Error al finalizar la solicitud');
+  return json.data;
+};

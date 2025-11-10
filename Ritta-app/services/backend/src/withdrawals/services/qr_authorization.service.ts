@@ -1,19 +1,17 @@
-import { QrAuthorization, Student, User, WithdrawalReason, Course, Withdrawal, Delegate } from '../../models';
+import { QrAuthorization, Student, User, WithdrawalReason, Course, Withdrawal, Delegate, EmergencyContact } from '../../models';
 import { Op, Transaction } from 'sequelize';
 import { QrGeneratorUtil } from '../utils/qr_generator.util';
 import { CreateQrAuthorizationData, ManualAuthorizationResponseDto, QrValidationInfoDto } from '../utils/withdrawal.types';
 import { WITHDRAWAL_CONSTANTS } from '../utils/withdrawal.constants';
 
 export class QrAuthorizationService {
-  
   /**
    * Crear una nueva autorización QR
    */
   async createQrAuthorization(
-    data: CreateQrAuthorizationData, 
+    data: CreateQrAuthorizationData,
     transaction?: Transaction
   ): Promise<{ qrCode: string; expiresAt: Date; qrAuthId: number }> {
-    
     // Verificar que no hay QR activo para este estudiante
     const activeQr = await QrAuthorization.findOne({
       where: {
@@ -23,34 +21,37 @@ export class QrAuthorizationService {
       },
       transaction
     });
-    
+
     if (activeQr) {
       throw new Error('Ya existe un código QR activo para este estudiante. Espere a que expire o sea utilizado.');
     }
-    
+
     // Generar código único y fecha de expiración
     const qrCodeNumber = await QrGeneratorUtil.generateUniqueCode();
     const qrCodeString = QrGeneratorUtil.formatQrCode(qrCodeNumber);
     const expiresAt = QrGeneratorUtil.calculateExpirationTime();
-    
+
     // Crear autorización QR
-    const qrAuth = await QrAuthorization.create({
-      code: qrCodeString,
-      studentId: data.studentId,
-      generatedByUserId: data.parentUserId,
-      reasonId: data.reasonId,
-      expiresAt,
-      customWithdrawalReason: data.customReason || null,
-      isUsed: false
-    }, { transaction });
-    
+    const qrAuth = await QrAuthorization.create(
+      {
+        code: qrCodeString,
+        studentId: data.studentId,
+        generatedByUserId: data.parentUserId,
+        reasonId: data.reasonId,
+        expiresAt,
+        customWithdrawalReason: data.customReason || null,
+        isUsed: false
+      },
+      { transaction }
+    );
+
     return {
       qrCode: qrCodeString,
       expiresAt,
       qrAuthId: qrAuth.id
     };
   }
-  
+
   /**
    * Obtener información completa de un QR para validación
    */
@@ -59,9 +60,9 @@ export class QrAuthorizationService {
     if (!QrGeneratorUtil.validateQrCodeFormat(qrCode)) {
       throw new Error('Formato de código QR inválido');
     }
-    
+
     const qrAuth = await QrAuthorization.findOne({
-      where: { 
+      where: {
         code: qrCode,
         isUsed: false
       },
@@ -94,13 +95,13 @@ export class QrAuthorizationService {
         }
       ]
     });
-    
+
     if (!qrAuth) {
       throw new Error('Código QR no encontrado o ya utilizado');
     }
-    
+
     const isExpired = QrGeneratorUtil.isExpired(qrAuth.expiresAt);
-    
+
     return {
       student: {
         id: qrAuth.student!.id,
@@ -127,51 +128,53 @@ export class QrAuthorizationService {
       isExpired
     };
   }
-  
+
   /**
    * Marcar QR como usado
    */
   async markQrAsUsed(qrCode: string, transaction?: Transaction): Promise<InstanceType<typeof QrAuthorization>> {
     const qrAuth = await QrAuthorization.findOne({
-      where: { 
+      where: {
         code: qrCode,
         isUsed: false
       },
       transaction
     });
-    
+
     if (!qrAuth) {
       throw new Error('Código QR no encontrado o ya utilizado');
     }
-    
+
     if (QrGeneratorUtil.isExpired(qrAuth.expiresAt)) {
       throw new Error('El código QR ha expirado');
     }
-    
-    await qrAuth.update({ 
-      isUsed: true,
-      updatedAt: new Date()
-    }, { transaction });
-    
+
+    await qrAuth.update(
+      {
+        isUsed: true,
+        updatedAt: new Date()
+      },
+      { transaction }
+    );
+
     return qrAuth;
   }
-  
+
   /**
    * Obtener QR activo de un estudiante
    */
   async getActiveQrForStudent(
-    studentId: number, 
+    studentId: number,
     parentUserId: number
-  ): Promise<{ 
-    qrCode: string; 
-    expiresAt: Date; 
-    qrAuthId: number; 
+  ): Promise<{
+    qrCode: string;
+    expiresAt: Date;
+    qrAuthId: number;
     minutesRemaining: number;
     student: { firstName: string; lastName: string };
     reason: { name: string };
     customReason: string | null;
   } | null> {
-    
     const activeQr = await QrAuthorization.findOne({
       where: {
         studentId: studentId,
@@ -192,14 +195,14 @@ export class QrAuthorizationService {
         }
       ]
     });
-  
+
     if (!activeQr) {
       return null;
     }
-  
+
     const now = new Date();
     const minutesRemaining = Math.max(0, Math.floor((activeQr.expiresAt.getTime() - now.getTime()) / (1000 * 60)));
-  
+
     return {
       qrCode: activeQr.code,
       expiresAt: activeQr.expiresAt,
@@ -215,21 +218,22 @@ export class QrAuthorizationService {
       customReason: activeQr.customWithdrawalReason
     };
   }
-  
+
   /**
    * Listar todos los QRs activos del apoderado
    */
-  async getActiveQrsForParent(parentUserId: number): Promise<Array<{
-    qrAuthId: number;
-    qrCode: string;
-    student: { id: number; firstName: string; lastName: string };
-    reason: { id: number; name: string };
-    customReason: string | null;
-    expiresAt: Date;
-    minutesRemaining: number;
-    createdAt: Date;
-  }>> {
-    
+  async getActiveQrsForParent(parentUserId: number): Promise<
+    Array<{
+      qrAuthId: number;
+      qrCode: string;
+      student: { id: number; firstName: string; lastName: string };
+      reason: { id: number; name: string };
+      customReason: string | null;
+      expiresAt: Date;
+      minutesRemaining: number;
+      createdAt: Date;
+    }>
+  > {
     const activeQrs = await QrAuthorization.findAll({
       where: {
         generatedByUserId: parentUserId,
@@ -250,11 +254,11 @@ export class QrAuthorizationService {
       ],
       order: [['expiresAt', 'ASC']]
     });
-  
-    return activeQrs.map(qr => {
+
+    return activeQrs.map((qr) => {
       const now = new Date();
       const minutesRemaining = Math.max(0, Math.floor((qr.expiresAt.getTime() - now.getTime()) / (1000 * 60)));
-      
+
       return {
         qrAuthId: qr.id,
         qrCode: qr.code,
@@ -274,7 +278,7 @@ export class QrAuthorizationService {
       };
     });
   }
-  
+
   /**
    * Inspector autoriza retiro SIN QR
    */
@@ -295,16 +299,8 @@ export class QrAuthorizationService {
     },
     transaction?: Transaction
   ): Promise<ManualAuthorizationResponseDto> {
-
-    const {
-      studentId,
-      inspectorUserId,
-      reasonId,
-      customReason,
-      delegateId,
-      manualDelegate,
-      unregisteredDelegateReason
-    } = payload;
+    const { studentId, inspectorUserId, reasonId, customReason, delegateId, manualDelegate, unregisteredDelegateReason } =
+      payload;
 
     const student = await Student.findByPk(studentId, {
       include: [
@@ -318,17 +314,22 @@ export class QrAuthorizationService {
     });
 
     if (!student) {
-      throw new Error('Estudiante no encontrado para autorización manual');
+      throw new Error('Estudiante no encontrado para autorizacion manual');
     }
 
     const parent = student.parent;
 
     if (!parent) {
-      throw new Error('El estudiante no tiene un apoderado asociado para autorizar retiros manuales');
+      throw new Error('El estudiante no tiene un apoderado asociado para autorizaciones manuales');
+    }
+
+    if (delegateId && manualDelegate) {
+      throw new Error('Debe usar un delegado registrado o ingresar uno manual, no ambos');
     }
 
     let resolvedDelegateId: number | undefined;
     let pendingParentApproval = false;
+    let emergencyContactId: number | undefined;
 
     if (delegateId) {
       const delegate = await Delegate.findByPk(delegateId, { transaction });
@@ -345,18 +346,25 @@ export class QrAuthorizationService {
     }
 
     if (manualDelegate) {
-      const createdDelegate = await Delegate.create({
-        parentUserId: parent.id,
-        name: manualDelegate.name,
-        phone: manualDelegate.phone,
-        relationshipToStudent: manualDelegate.relationshipToStudent
-      }, { transaction });
-
-      resolvedDelegateId = createdDelegate.id;
       pendingParentApproval = true;
+      const emergencyContact = await EmergencyContact.create(
+        {
+          parentUserId: parent.id,
+          name: manualDelegate.name,
+          phone: manualDelegate.phone,
+          relationship: manualDelegate.relationshipToStudent,
+          isVerified: false
+        },
+        { transaction }
+      );
+      emergencyContactId = emergencyContact.id;
     }
 
-    
+    if (!manualDelegate && !resolvedDelegateId) {
+      throw new Error('Debe seleccionar o registrar un delegado para el retiro manual');
+    }
+
+    // Si hay un QR activo, lo marcamos como usado y lo asociamos; si no, generamos un "QR" manual usado de inmediato.
     const activeQr = await QrAuthorization.findOne({
       where: {
         studentId,
@@ -365,83 +373,98 @@ export class QrAuthorizationService {
       },
       transaction
     });
-  
+
     let qrAuthId: number;
     let hadActiveQr = false;
     let message = '';
     let qrCode = '';
-  
+
     if (activeQr) {
-      // Marcar QR existente como usado
-      await activeQr.update({ 
-        isUsed: true,
-        updatedAt: new Date(),
-        assignedDelegateId: resolvedDelegateId ?? activeQr.assignedDelegateId
-      }, { transaction });
-      
+      await activeQr.update(
+        {
+          isUsed: true,
+          updatedAt: new Date(),
+          assignedDelegateId: resolvedDelegateId ?? activeQr.assignedDelegateId
+        },
+        { transaction }
+      );
+
       qrAuthId = activeQr.id;
       qrCode = activeQr.code;
       hadActiveQr = true;
-      message = `QR activo ${activeQr.code} marcado como usado por inspector`;
-      
+      message = 'QR activo marcado como usado por inspector';
     } else {
-      // Crear nuevo QR ya marcado como usado
       const qrCodeNumber = await QrGeneratorUtil.generateUniqueCode();
       const qrCodeString = QrGeneratorUtil.formatQrCode(qrCodeNumber);
-      
-      const qrAuth = await QrAuthorization.create({
-        code: qrCodeString,
-         studentId,
-        generatedByUserId: inspectorUserId,
-        reasonId,
-        expiresAt: new Date(),
-        customWithdrawalReason: customReason || null,
-        isUsed: true,
-        assignedDelegateId: resolvedDelegateId ?? null
-      }, { transaction });
-      
+
+      const qrAuth = await QrAuthorization.create(
+        {
+          code: qrCodeString,
+          studentId,
+          generatedByUserId: inspectorUserId, // generado por inspector para trazar la acción
+          reasonId,
+          expiresAt: new Date(), // expira inmediatamente (marca manual)
+          customWithdrawalReason: customReason || null,
+          isUsed: true,
+          assignedDelegateId: resolvedDelegateId ?? null
+        },
+        { transaction }
+      );
+
       qrAuthId = qrAuth.id;
       qrCode = qrCodeString;
       hadActiveQr = false;
-      message = `Autorización manual creada: ${qrCodeString}`;
-      
+      message = 'Autorización manual creada';
     }
-    if (manualDelegate && resolvedDelegateId) {
-      const notesParts: string[] = [];
 
-      if (unregisteredDelegateReason) {
-        notesParts.push(`Razón delegado no registrado: ${unregisteredDelegateReason}`);
-      }
+    // Notas informativas
+    const notesParts: string[] = [];
+    if (manualDelegate && unregisteredDelegateReason) {
+      notesParts.push(`Razón delegado no registrado: ${unregisteredDelegateReason}`);
+    }
+    if (manualDelegate) {
+      notesParts.push(
+        `Delegado extraordinario: ${manualDelegate.name} (${manualDelegate.relationshipToStudent})`
+      );
+      notesParts.push(`Teléfono delegado: ${manualDelegate.phone}`);
+      notesParts.push(`RUT delegado: ${manualDelegate.rut}`);
+    }
 
-      const notes = notesParts.length ? notesParts.join('\n') : null;
-
-      await Withdrawal.create({
+    await Withdrawal.create(
+      {
         qrAuthorizationId: qrAuthId,
         studentId,
         organizationApproverUserId: inspectorUserId,
         reasonId,
         method: WITHDRAWAL_CONSTANTS.WITHDRAWAL_METHOD.MANUAL,
-        status: WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.PENDING_PARENT_APPROVAL,
-        contactVerified: false,
+        status: pendingParentApproval
+          ? WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.PENDING
+          : WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.APPROVED,
+        contactVerified: !pendingParentApproval,
         retrieverUserId: null,
-        retrieverDelegateId: resolvedDelegateId,
-        retrieverNameIfOther: manualDelegate.name,
-        retrieverRutIfOther: manualDelegate.rut,
-        retrieverRelationshipIfOther: manualDelegate.relationshipToStudent,
+        retrieverDelegateId: resolvedDelegateId ?? null,
+        retrieverEmergencyContactId: emergencyContactId ?? null,
+        retrieverNameIfOther: manualDelegate ? manualDelegate.name : null,
+        retrieverRutIfOther: manualDelegate ? manualDelegate.rut : null,
+        retrieverRelationshipIfOther: manualDelegate ? manualDelegate.relationshipToStudent : null,
         customWithdrawalReason: customReason || null,
-        notes,
+        notes: notesParts.length ? notesParts.join('\n') : null,
         withdrawalTime: new Date()
-      }, { transaction });
+      },
+      { transaction }
+    );
 
-      message = 'Autorización manual registrada y pendiente de aprobación del apoderado para el delegado no registrado';
-    }
-  
+    message = pendingParentApproval
+      ? 'Autorización manual registrada y pendiente de aprobación del apoderado para el delegado no registrado'
+      : 'Retiro manual registrado y autorizado';
+
     return {
       qrAuthId,
       qrCode,
       manualAuthorization: true,
       hadActiveQr,
-      message
+      message,
+      pendingParentApproval
     };
   }
 
@@ -476,26 +499,22 @@ export class QrAuthorizationService {
       totalExpired: number;
     };
   }> {
-    
     const { limit = 20, offset = 0, studentId, includePending = true } = options;
-    
+
     // Construir condiciones WHERE
     const whereConditions: any = {
       generatedByUserId: parentUserId
     };
-    
+
     if (studentId) {
       whereConditions.studentId = studentId;
     }
-    
+
     if (!includePending) {
       // Solo mostrar QRs usados o expirados
-      whereConditions[Op.or] = [
-        { isUsed: true },
-        { expiresAt: { [Op.lte]: new Date() } }
-      ];
+      whereConditions[Op.or] = [{ isUsed: true }, { expiresAt: { [Op.lte]: new Date() } }];
     }
-    
+
     // Obtener QRs/retiros
     const { count, rows: qrAuths } = await QrAuthorization.findAndCountAll({
       where: whereConditions,
@@ -523,12 +542,12 @@ export class QrAuthorizationService {
       limit,
       offset
     });
-    
+
     // Procesar datos
     const now = new Date();
-    const withdrawals = qrAuths.map(qr => {
+    const withdrawals = qrAuths.map((qr) => {
       let status: 'COMPLETED' | 'ACTIVE' | 'EXPIRED';
-      
+
       if (qr.isUsed) {
         status = 'COMPLETED';
       } else if (qr.expiresAt <= now) {
@@ -536,7 +555,7 @@ export class QrAuthorizationService {
       } else {
         status = 'ACTIVE';
       }
-      
+
       return {
         id: qr.id,
         qrCode: qr.code,
@@ -558,12 +577,12 @@ export class QrAuthorizationService {
         isManualAuthorization: qr.expiresAt <= qr.createdAt! // Si expira inmediatamente, es manual
       };
     });
-    
+
     // Calcular resumen
-    const totalCompleted = withdrawals.filter(w => w.status === 'COMPLETED').length;
-    const totalActive = withdrawals.filter(w => w.status === 'ACTIVE').length;
-    const totalExpired = withdrawals.filter(w => w.status === 'EXPIRED').length;
-    
+    const totalCompleted = withdrawals.filter((w) => w.status === 'COMPLETED').length;
+    const totalActive = withdrawals.filter((w) => w.status === 'ACTIVE').length;
+    const totalExpired = withdrawals.filter((w) => w.status === 'EXPIRED').length;
+
     return {
       withdrawals,
       total: count,
@@ -596,10 +615,9 @@ export class QrAuthorizationService {
       lastWithdrawal?: Date;
     }>;
   }> {
-    
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     // Stats del mes actual
     const thisMonthQrs = await QrAuthorization.findAll({
       where: {
@@ -607,22 +625,22 @@ export class QrAuthorizationService {
         createdAt: { [Op.gte]: firstDayOfMonth }
       }
     });
-    
+
     const thisMonthGenerated = thisMonthQrs.length;
-    const thisMonthCompleted = thisMonthQrs.filter(qr => qr.isUsed).length;
-    const thisMonthExpired = thisMonthQrs.filter(qr => !qr.isUsed && qr.expiresAt <= now).length;
-    
+    const thisMonthCompleted = thisMonthQrs.filter((qr) => qr.isUsed).length;
+    const thisMonthExpired = thisMonthQrs.filter((qr) => !qr.isUsed && qr.expiresAt <= now).length;
+
     // Stats de todos los tiempos
     const allTimeQrs = await QrAuthorization.findAll({
       where: { generatedByUserId: parentUserId }
     });
-    
+
     const allTimeGenerated = allTimeQrs.length;
-    const allTimeCompleted = allTimeQrs.filter(qr => qr.isUsed).length;
+    const allTimeCompleted = allTimeQrs.filter((qr) => qr.isUsed).length;
     const successRate = allTimeGenerated > 0 ? (allTimeCompleted / allTimeGenerated) * 100 : 0;
-    
+
     // Stats por estudiante
-    const studentStats = await QrAuthorization.findAll({
+    const studentStatsRows = await QrAuthorization.findAll({
       where: { generatedByUserId: parentUserId },
       include: [
         {
@@ -633,13 +651,22 @@ export class QrAuthorizationService {
       ],
       order: [['createdAt', 'DESC']]
     });
-    
+
     // Agrupar por estudiante
-    const studentMap = new Map();
-    studentStats.forEach(qr => {
+    const studentMap = new Map<
+      number,
+      {
+        studentId: number;
+        studentName: string;
+        totalWithdrawals: number;
+        lastWithdrawal?: Date;
+      }
+    >();
+
+    studentStatsRows.forEach((qr) => {
       const studentId = qr.student!.id;
       const studentName = `${qr.student!.firstName} ${qr.student!.lastName}`;
-      
+
       if (!studentMap.has(studentId)) {
         studentMap.set(studentId, {
           studentId,
@@ -648,15 +675,15 @@ export class QrAuthorizationService {
           lastWithdrawal: undefined
         });
       }
-      
-      const stats = studentMap.get(studentId);
+
+      const stats = studentMap.get(studentId)!;
       stats.totalWithdrawals++;
-      
+
       if (qr.isUsed && (!stats.lastWithdrawal || qr.updatedAt! > stats.lastWithdrawal)) {
         stats.lastWithdrawal = qr.updatedAt!;
       }
     });
-    
+
     return {
       thisMonth: {
         generated: thisMonthGenerated,
@@ -682,10 +709,9 @@ export class QrAuthorizationService {
         expiresAt: { [Op.lt]: new Date() }
       }
     });
-    
+
     return result;
   }
-
 }
 
 export default new QrAuthorizationService();

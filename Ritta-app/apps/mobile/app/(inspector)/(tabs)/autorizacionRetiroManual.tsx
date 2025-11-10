@@ -46,8 +46,9 @@ export default function ValidacionRetiroScreen() {
     ? `${withdrawalReason.reasonName} - ${withdrawalReason.customReason}` 
     : withdrawalReason.reasonName;
 
-const displayedDelegate = manualDelegate || selectedDelegate || null;
+  const displayedDelegate = manualDelegate || selectedDelegate || null;
   const delegateTitle = manualDelegate ? 'Delegado extraordinario' : 'Delegado registrado';
+  const requiresParentApproval = Boolean(manualDelegate && !selectedDelegate);
 
   const handleAuthorization = async (status: string) => {
     if (!student?.id || !withdrawalReason?.reasonId) {
@@ -62,7 +63,7 @@ const displayedDelegate = manualDelegate || selectedDelegate || null;
       reasonId: withdrawalReason.reasonId,
       customReason: withdrawalReason.reasonName.startsWith('OTRO')
         ? withdrawalReason.customReason || ''
-        : null,
+        : '',
     };
 
     if (selectedDelegate?.id) {
@@ -167,7 +168,15 @@ const displayedDelegate = manualDelegate || selectedDelegate || null;
           </ScrollView>
         </View>
 
-        <Text className="text-xs text-gray-500 text-center mt-2"> (*) Solicitar autorización al operador para validar su identidad. </Text>
+        <Text className="text-xs text-gray-500 text-center mt-2">
+          (*) Solicitar autorizacin al operador para validar su identidad.
+        </Text>
+        {requiresParentApproval && (
+          <Text className="text-xs text-gray-500 text-center mt-1">
+            Enviar autorizacin notificar al apoderado para aprobar al delegado extraordinario antes de registrar el retiro.
+          </Text>
+        )}
+
 
         <View className="mt-2 flex-row space-x-2">
           {/* Botón de autorizar */}
@@ -176,7 +185,9 @@ const displayedDelegate = manualDelegate || selectedDelegate || null;
             onPress={() => handleAuthorization('authorized')} 
             disabled={loading}  // Deshabilita el botón cuando está cargando
           >
-            <Text className="text-white font-medium">Autorizar</Text>
+            <Text className="text-white font-medium">
+              {requiresParentApproval ? 'Enviar autorizacin' : 'Autorizar'}
+            </Text>
           </TouchableOpacity>
 
           {/* Botón de denegar */}

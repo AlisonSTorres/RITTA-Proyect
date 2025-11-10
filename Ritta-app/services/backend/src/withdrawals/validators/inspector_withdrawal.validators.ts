@@ -326,3 +326,45 @@ export const getStatsSchema = {
       })
   })
 };
+/**
+ * Schema para listar solicitudes confirmadas
+ */
+export const getInspectorPendingApprovalsSchema = {
+  query: Joi.object({
+    limit: Joi.number().integer().min(1).max(100).optional()
+  })
+};
+
+/**
+ * Schema para resolver solicitudes confirmadas
+ */
+export const resolveInspectorPendingApprovalSchema = {
+  params: Joi.object({
+    withdrawalId: Joi.number()
+      .integer()
+      .positive()
+      .required()
+      .messages({
+        'number.base': 'El ID del retiro debe ser un número',
+        'number.integer': 'El ID del retiro debe ser un número entero',
+        'number.positive': 'El ID del retiro debe ser positivo',
+        'any.required': 'El ID del retiro es obligatorio'
+      })
+  }),
+  body: Joi.object({
+    action: Joi.string()
+      .valid('APPROVE', 'DENY')
+      .required()
+      .messages({
+        'any.only': 'La acción debe ser APPROVE o DENY',
+        'any.required': 'La acción es obligatoria'
+      }),
+    comment: Joi.string()
+      .max(500)
+      .optional()
+      .allow('')
+      .messages({
+        'string.max': 'El comentario no puede exceder 500 caracteres'
+      })
+  })
+};

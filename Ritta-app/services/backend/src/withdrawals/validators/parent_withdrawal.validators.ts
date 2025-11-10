@@ -237,3 +237,45 @@ export const cancelQrSchema = {
       })
   })
 };
+/**
+ * Schema para listar aprobaciones manuales pendientes
+ */
+export const getPendingApprovalsSchema = {
+  query: Joi.object({
+    limit: Joi.number().integer().min(1).max(100).default(20).optional()
+  })
+};
+
+/**
+ * Schema para resolver una aprobación manual pendiente
+ */
+export const resolvePendingApprovalSchema = {
+  params: Joi.object({
+    withdrawalId: Joi.number()
+      .integer()
+      .positive()
+      .required()
+      .messages({
+        'number.base': 'El ID del retiro debe ser un número',
+        'number.integer': 'El ID del retiro debe ser un número entero',
+        'number.positive': 'El ID del retiro debe ser positivo',
+        'any.required': 'El ID del retiro es obligatorio'
+      })
+  }),
+  body: Joi.object({
+    action: Joi.string()
+      .valid('APPROVE', 'DENY')
+      .required()
+      .messages({
+        'any.only': 'La acción debe ser APPROVE o DENY',
+        'any.required': 'La acción es obligatoria'
+      }),
+    comment: Joi.string()
+      .max(500)
+      .optional()
+      .allow('')
+      .messages({
+        'string.max': 'El comentario no puede exceder 500 caracteres'
+      })
+  })
+};

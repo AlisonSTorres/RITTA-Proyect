@@ -350,6 +350,81 @@ export class ParentWithdrawalController {
   }
 
   /**
+   * Listar solicitudes pendientes de autorización manual
+   * GET /api/withdrawals/parent/pending-approvals
+   */
+  async getPendingApprovals(req: Request, res: Response): Promise<void> {
+    try {
+      const parentUserId = req.user?.id;
+
+      if (!parentUserId) {
+        res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+        return;
+      }
+
+      const approvals = await WithdrawalService.getPendingManualApprovals(parentUserId);
+
+      res.status(200).json({
+        success: true,
+        data: approvals,
+        message: 'Solicitudes pendientes obtenidas exitosamente'
+      });
+    } catch (error) {
+      console.error('Error obteniendo solicitudes pendientes:', error);
+      res.status(500).json({ success: false, message: 'Error interno del servidor' });
+    }
+  }
+
+  /**
+   * Resolver una autorización manual pendiente
+   * POST /api/withdrawals/parent/pending-approvals/:withdrawalId/decision
+   */
+  async resolvePendingApproval(req: Request, res: Response): Promise<void> {
+    try {
+      const parentUserId = req.user?.id;
+      const withdrawalId = parseInt(req.params.withdrawalId, 10);
+      const { action, comment } = req.body;
+
+      if (!parentUserId) {
+        res.status(401).json({ success: false, message: 'Usuario no autenticado' });
+        return;
+      }
+
+      if (Number.isNaN(withdrawalId)) {
+        res.status(400).json({ success: false, message: 'ID de retiro inválido' });
+        return;
+      }
+
+      const result = await WithdrawalService.resolvePendingManualApproval({
+        parentUserId,
+        withdrawalId,
+        action,
+        comment
+      });
+
+      const message = action === 'APPROVE'
+        ? 'Solicitud aprobada exitosamente'
+        : 'Solicitud rechazada exitosamente';
+
+      res.status(200).json({ success: true, data: result, message });
+    } catch (error: any) {
+      console.error('Error resolviendo solicitud pendiente:', error);
+      const message = error?.message || 'Error interno del servidor';
+
+      if (message.toLowerCase().includes('no tiene permisos')) {
+        res.status(403).json({ success: false, message });
+        return;
+      }
+
+      if (message.toLowerCase().includes('no encontrada')) {
+        res.status(404).json({ success: false, message });
+        return;
+      }
+
+      res.status(400).json({ success: false, message });
+    }
+  }
+  /**
    * Obtener motivos de retiro disponibles
    * GET /api/withdrawals/parent/reasons
    */

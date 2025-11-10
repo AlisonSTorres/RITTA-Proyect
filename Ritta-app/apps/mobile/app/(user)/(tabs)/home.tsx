@@ -39,6 +39,12 @@ export default function HomeScreen() {
           icon={<FontAwesome5 name="graduation-cap" size={30} color="#1D4ED8" />}
         />
 
+        <OptionButton
+          title="Notificaciones"
+          onPress={() => router.navigate('/notificaciones')}
+          icon={<Ionicons name="notifications-outline" size={30} color="#1D4ED8" />}
+        />
+
 
         <OptionButton
           title="Historial de Retiros"

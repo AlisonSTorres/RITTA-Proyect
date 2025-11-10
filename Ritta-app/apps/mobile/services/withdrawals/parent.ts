@@ -133,3 +133,34 @@ export const cancelActiveQrCode = async (identifier: string | number) => {
 
   return json.data; // Aquí está la data de la respuesta exitosa del backend
 };
+
+// Solicitudes de autorizaci�n manual pendientes
+export const fetchPendingManualApprovals = async () => {
+  const response = await fetch(`${API_BASE_URL}/withdrawals/parent/pending-approvals`, {
+    method: 'GET',
+    headers: await getAuthHeaders(),
+  });
+
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Error al obtener solicitudes pendientes');
+  return json.data;
+};
+
+export const resolveManualApprovalRequest = async (
+  withdrawalId: number,
+  action: 'APPROVE' | 'DENY',
+  comment?: string,
+) => {
+  const response = await fetch(
+    `${API_BASE_URL}/withdrawals/parent/pending-approvals/${withdrawalId}/decision`,
+    {
+      method: 'POST',
+      headers: await getAuthHeaders(),
+      body: JSON.stringify({ action, comment }),
+    },
+  );
+
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Error al responder la solicitud');
+  return json.data;
+};
