@@ -19,6 +19,10 @@ interface InspectorApproval {
   id: number;
   requestedAt: string;
   notes?: string;
+  status: 'PENDING' | 'APPROVED' | 'DENIED';
+  contactVerified: boolean;
+  decisionAt?: string;
+  parentAction?: 'APPROVE' | 'DENY';
   student: {
     firstName: string;
     lastName: string;
@@ -94,13 +98,13 @@ export default function InspectorNotificationsScreen() {
       await resolveInspectorPendingApproval(withdrawalId, action);
       setApprovals(prev => prev.filter(item => item.id !== withdrawalId));
       Alert.alert(
-        'OperaciÛn exitosa',
+        'Operaci√≥n exitosa',
         action === 'APPROVE'
           ? 'El retiro ha sido marcado como autorizado.'
           : 'Has rechazado esta solicitud.',
       );
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'No se pudo completar la acciÛn');
+      Alert.alert('Error', error?.message || 'No se pudo completar la acci√≥n');
     } finally {
       setActionId(null);
     }
@@ -110,10 +114,10 @@ export default function InspectorNotificationsScreen() {
     const actionText = action === 'APPROVE' ? 'autorizar' : 'rechazar';
     Alert.alert(
       'Confirmar',
-      øDeseas  este retiro?,
+      '¬øDeseas  este retiro?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'SÌ', onPress: () => handleDecision(withdrawalId, action) },
+        { text: 'S√≠', onPress: () => handleDecision(withdrawalId, action) },
       ],
       { cancelable: true },
     );
@@ -121,6 +125,14 @@ export default function InspectorNotificationsScreen() {
 
   const renderCard = (item: InspectorApproval) => {
     const processing = actionId === item.id;
+    const isAwaitingInspectorDecision = item.status === 'PENDING' && item.contactVerified;
+    const guardianMessage = item.parentAction === 'DENY'
+      ? 'El apoderado rechaz√≥ esta autorizaci√≥n.'
+      : item.parentAction === 'APPROVE'
+        ? 'El apoderado confirm√≥ al delegado.'
+        : undefined;
+    const decisionTimestamp = item.decisionAt ? formatDate(item.decisionAt) : undefined;
+
     return (
       <View key={item.id} className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
         <View className="flex-row justify-between mb-2">
@@ -135,13 +147,13 @@ export default function InspectorNotificationsScreen() {
 
         <View className="mb-2 mt-2">
           <Text className="text-xs font-semibold text-gray-500">Delegado confirmado</Text>
-          <Text className="text-sm text-gray-700">{item.delegate.name}</Text>
-          {item.delegate.rut ? (
-            <Text className=\"text-sm text-gray-500\">RUT: {item.delegate.rut}</Text>
+          <Text className="text-sm text-gray-700">{item.delegate.name}</Text>
+          {item.delegate.rut ? (
+            <Text className="text-sm text-gray-500">RUT: {item.delegate.rut}</Text>
           ) : null}
-          <Text className="text-sm text-gray-500">TelÈfono: {item.delegate.phone || 'No informado'}</Text>
+          <Text className="text-sm text-gray-500">Tel√©fono: {item.delegate.phone || 'No informado'}</Text>
           <Text className="text-sm text-gray-500">
-            RelaciÛn: {item.delegate.relationshipToStudent || 'No informada'}
+            Relaci√≥n: {item.delegate.relationshipToStudent || 'No informada'}
           </Text>
         </View>
 
@@ -159,6 +171,13 @@ export default function InspectorNotificationsScreen() {
           </Text>
         ) : null}
 
+        {guardianMessage ? (
+          <Text className="text-xs text-amber-600 mb-2">
+            {guardianMessage}
+            {decisionTimestamp ? ` (${decisionTimestamp})` : ''}
+          </Text>
+        ) : null}
+
         {item.notes ? (
           <View className="mb-3">
             <Text className="text-xs font-semibold text-gray-500">Notas</Text>
@@ -166,27 +185,34 @@ export default function InspectorNotificationsScreen() {
           </View>
         ) : null}
 
-        <View className="flex-row space-x-3 mt-2">
-          <TouchableOpacity
-            className="flex-1 bg-green-600 py-3 rounded-xl"
-            onPress={() => confirmDecision(item.id, 'APPROVE')}
-            disabled={processing}
-          >
-            <Text className="text-center text-white font-semibold">Autorizar retiro</Text>
-          </TouchableOpacity>
+        {!isAwaitingInspectorDecision ? (
+          <Text className="text-xs text-gray-400 mb-2">
+            Estado actual: {item.status === 'DENIED' ? 'Rechazado' : item.status === 'APPROVED' ? 'Autorizado' : 'En revisi√≥n'}
+          </Text>
+        ) : null}
 
-          <TouchableOpacity
-            className="flex-1 bg-red-600 py-3 rounded-xl"
-            onPress={() => confirmDecision(item.id, 'DENY')}
-            disabled={processing}
-          >
-            <Text className="text-center text-white font-semibold">Rechazar</Text>
-          </TouchableOpacity>
-        </View>
+        {isAwaitingInspectorDecision ? (
+          <View className="flex-row space-x-3 mt-2">
+            <TouchableOpacity
+              className="flex-1 bg-green-600 py-3 rounded-xl"
+              onPress={() => confirmDecision(item.id, 'APPROVE')}
+              disabled={processing}
+            >
+              <Text className="text-center text-white font-semibold">Autorizar retiro</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="flex-1 bg-red-600 py-3 rounded-xl"
+              onPress={() => confirmDecision(item.id, 'DENY')}
+              disabled={processing}
+            >
+              <Text className="text-center text-white font-semibold">Rechazar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
     );
   };
-
   const renderContent = () => {
     if (loading) {
       return (
@@ -202,7 +228,7 @@ export default function InspectorNotificationsScreen() {
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-2xl font-bold text-blue-700 mb-3">Sin confirmaciones</Text>
           <Text className="text-center text-gray-500">
-            Cuando un apoderado apruebe un delegado extraordinario, ver·s la solicitud aquÌ para completar el retiro.
+            Cuando un apoderado apruebe un delegado extraordinario, ver√°s la solicitud aqu√≠ para completar el retiro.
           </Text>
         </View>
       );
@@ -223,4 +249,3 @@ export default function InspectorNotificationsScreen() {
 
   return <GlobalBackground>{renderContent()}</GlobalBackground>;
 }
-

@@ -126,7 +126,15 @@ export class InspectorWithdrawalController {
     const transaction = await sequelize.transaction();
     
     try {
-      const { studentId, reasonId, customReason, delegateId, manualDelegate, unregisteredDelegateReason } = req.body;
+       const {
+        studentId,
+        reasonId,
+        customReason,
+        delegateId,
+        manualDelegate,
+        unregisteredDelegateReason,
+        discardedDelegateIds
+      } = req.body;
       const inspectorUserId = req.user?.id;
       
       if (!inspectorUserId) {
@@ -147,22 +155,27 @@ export class InspectorWithdrawalController {
       }
       
         const result = await QrAuthorizationService.authorizeWithoutQr({
-
         studentId,
         inspectorUserId,
         reasonId,
         customReason,
         delegateId,
         manualDelegate,
-        unregisteredDelegateReason
+        unregisteredDelegateReason,
+        discardedDelegateIds
       }, transaction);
       
       await transaction.commit();
       
-      res.status(201).json({
+       const statusCode = result.manualAuthorization ? 201 : 200;
+      res.status(statusCode).json({
         success: true,
         data: result,
-        message: 'Retiro autorizado manualmente por inspector'
+        message:
+          result.message ||
+          (result.manualAuthorization
+            ? 'Retiro autorizado manualmente por inspector'
+            : 'Delegados registrados disponibles para selección')
       });
     } catch (error: any) {
       await transaction.rollback();

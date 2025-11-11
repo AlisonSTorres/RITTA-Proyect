@@ -350,7 +350,7 @@ export class ParentWithdrawalController {
   }
 
   /**
-   * Listar solicitudes pendientes de autorización manual
+   * Listar solicitudes pendientes de autorizaciï¿½n manual
    * GET /api/withdrawals/parent/pending-approvals
    */
   async getPendingApprovals(req: Request, res: Response): Promise<void> {
@@ -376,7 +376,7 @@ export class ParentWithdrawalController {
   }
 
   /**
-   * Resolver una autorización manual pendiente
+   * Resolver una autorizacion manual pendiente
    * POST /api/withdrawals/parent/pending-approvals/:withdrawalId/decision
    */
   async resolvePendingApproval(req: Request, res: Response): Promise<void> {
@@ -391,7 +391,7 @@ export class ParentWithdrawalController {
       }
 
       if (Number.isNaN(withdrawalId)) {
-        res.status(400).json({ success: false, message: 'ID de retiro inválido' });
+        res.status(400).json({ success: false, message: 'ID de retiro invï¿½lido' });
         return;
       }
 

@@ -1,4 +1,12 @@
-import { Withdrawal, Student, User, WithdrawalReason, Course, Delegate } from '../../models';
+import {
+  Withdrawal,
+  Student,
+  User,
+  WithdrawalReason,
+  Course,
+  Delegate,
+  EmergencyContact
+} from '../../models';
 import { Transaction, Op } from 'sequelize';
 import sequelizeInstance from '../../config/database';
 import {
@@ -11,10 +19,16 @@ import {
   InspectorManualApprovalDto,
   ManualApprovalAction,
   ManualApprovalResolutionDto,
+  PendingManualApprovalDto,
   HistoryFiltersDto
 } from '../utils/withdrawal.types';
 import { WITHDRAWAL_CONSTANTS, WithdrawalStatus, WithdrawalMethod } from '../utils/withdrawal.constants';
 import QrAuthorizationService from './qr_authorization.service';
+import {
+  withdrawalEventBus,
+  WithdrawalEvent,
+  ManualApprovalResolvedEventPayload
+} from '../../utils/withdrawal.events';
 
 export class WithdrawalService {
   /**
@@ -443,6 +457,196 @@ export class WithdrawalService {
       hasMore: offset + limit < count
     };
   }
+ /**
+   * Listar autorizaciones manuales pendientes para un apoderado
+   */
+ async getPendingManualApprovals(parentUserId: number): Promise<PendingManualApprovalDto[]> {
+    const withdrawals = await Withdrawal.findAll({
+      where: {
+        method: WITHDRAWAL_CONSTANTS.WITHDRAWAL_METHOD.MANUAL,
+        status: WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.PENDING,
+        contactVerified: false,
+        retrieverEmergencyContactId: { [Op.ne]: null }
+      },
+      include: [
+        {
+          model: Student,
+          as: 'student',
+          attributes: ['id', 'firstName', 'lastName', 'rut'],
+          required: true,
+          where: { parentId: parentUserId },
+          include: [
+            {
+              model: Course,
+              as: 'course',
+              attributes: ['name'],
+              required: false
+            }
+          ]
+        },
+        {
+          model: WithdrawalReason,
+          as: 'reason',
+          attributes: ['id', 'name'],
+          required: true
+        },
+        {
+          model: User,
+          as: 'organizationApproverUser',
+          attributes: ['id', 'firstName', 'lastName'],
+          required: false
+        },
+        {
+          model: EmergencyContact,
+          as: 'retrieverEmergencyContact',
+          attributes: ['id', 'name', 'phone', 'relationship', 'isTemporary', 'isSingleUse', 'singleUseConsumedAt', 'isVerified'],
+          required: false
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    return withdrawals.map((withdrawal) => ({
+      id: withdrawal.id,
+      requestedAt: withdrawal.createdAt!,
+      notes: withdrawal.notes || undefined,
+      student: {
+        id: withdrawal.student!.id,
+        firstName: withdrawal.student!.firstName,
+        lastName: withdrawal.student!.lastName,
+        rut: withdrawal.student!.rut,
+        courseName: withdrawal.student!.course?.name
+      },
+      delegate: {
+        id: withdrawal.retrieverEmergencyContact?.id ?? null,
+        name:
+          withdrawal.retrieverEmergencyContact?.name ||
+          withdrawal.retrieverNameIfOther ||
+          'Delegado extraordinario',
+        phone: withdrawal.retrieverEmergencyContact?.phone ?? null,
+        rut: withdrawal.retrieverRutIfOther || null,
+        relationshipToStudent:
+          withdrawal.retrieverEmergencyContact?.relationship ||
+          withdrawal.retrieverRelationshipIfOther ||
+          null
+      },
+      reason: {
+        id: withdrawal.reason!.id,
+        name: withdrawal.reason!.name,
+        customReason: withdrawal.customWithdrawalReason || undefined
+      },
+      inspector: withdrawal.organizationApproverUser
+        ? {
+            id: withdrawal.organizationApproverUser.id,
+            firstName: withdrawal.organizationApproverUser.firstName,
+            lastName: withdrawal.organizationApproverUser.lastName
+          }
+        : undefined
+    }));
+  }
+
+  async resolvePendingManualApproval(params: {
+    parentUserId: number;
+    withdrawalId: number;
+    action: ManualApprovalAction;
+    comment?: string;
+  }): Promise<ManualApprovalResolutionDto> {
+    const { parentUserId, withdrawalId, action, comment } = params;
+
+    const transaction = await sequelizeInstance.transaction();
+
+    try {
+      const withdrawal = await Withdrawal.findOne({
+        where: {
+          id: withdrawalId,
+          method: WITHDRAWAL_CONSTANTS.WITHDRAWAL_METHOD.MANUAL,
+          status: WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.PENDING,
+          contactVerified: false
+        },
+        include: [
+          {
+            model: Student,
+            as: 'student',
+            attributes: ['id', 'parentId', 'firstName', 'lastName', 'rut'],
+            required: true,
+            where: { parentId: parentUserId }
+          },
+          {
+            model: EmergencyContact,
+            as: 'retrieverEmergencyContact',
+            attributes: ['id', 'name', 'phone', 'relationship', 'isTemporary', 'isSingleUse', 'singleUseConsumedAt', 'isVerified'],
+            required: false
+          }
+        ],
+        transaction
+      });
+
+      if (!withdrawal) {
+        throw new Error('Solicitud pendiente no encontrada o no autorizada');
+      }
+
+      const normalizedAction = action?.toUpperCase() as ManualApprovalAction;
+      if (!Object.values(WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION).includes(normalizedAction)) {
+        throw new Error('Acción de aprobación manual inválida');
+      }
+
+      const notesParts: string[] = [];
+      if (withdrawal.notes) {
+        notesParts.push(withdrawal.notes);
+      }
+
+      if (normalizedAction === WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.APPROVE) {
+        notesParts.push('Apoderado aprobó al delegado extraordinario.');
+        withdrawal.contactVerified = true;
+        withdrawal.guardianAuthorizerUserId = parentUserId;
+        withdrawal.guardianAuthorizerEmergencyContactId = withdrawal.retrieverEmergencyContactId;
+
+        if (withdrawal.retrieverEmergencyContact) {
+          await withdrawal.retrieverEmergencyContact.update(
+            {
+              isVerified: true,
+              isTemporary: true,
+              isSingleUse: true,
+              singleUseConsumedAt: withdrawal.retrieverEmergencyContact.singleUseConsumedAt || new Date()
+            },
+            { transaction }
+          );
+        }
+      } else {
+        notesParts.push('Apoderado rechazó al delegado extraordinario.');
+        withdrawal.status = WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.DENIED;
+        withdrawal.contactVerified = false;
+        withdrawal.guardianAuthorizerUserId = parentUserId;
+
+        if (withdrawal.retrieverEmergencyContact) {
+          await withdrawal.retrieverEmergencyContact.destroy({ transaction });
+        }
+
+        withdrawal.retrieverEmergencyContactId = null;
+        withdrawal.guardianAuthorizerEmergencyContactId = null;
+      }
+
+      if (comment && comment.trim().length > 0) {
+        notesParts.push(`Comentario apoderado: ${comment.trim()}`);
+      }
+
+      withdrawal.notes = notesParts.join('\n');
+
+      await withdrawal.save({ transaction });
+
+      await transaction.commit();
+
+      return {
+        id: withdrawal.id,
+        status: withdrawal.status as WithdrawalStatus,
+        contactVerified: withdrawal.contactVerified,
+        notes: withdrawal.notes || undefined
+      };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
 
   /**
    * Historial de retiros (vista inspectores, con filtros)
@@ -746,10 +950,7 @@ export class WithdrawalService {
       },
       { transaction }
     );
-
     return withdrawal as unknown as InstanceType<typeof Withdrawal>;
   }
 }
-
 export default new WithdrawalService();
-

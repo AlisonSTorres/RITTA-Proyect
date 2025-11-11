@@ -156,6 +156,12 @@ export interface ManualAuthorizationRequestDto {
     phone: string;
     relationshipToStudent: string;
   };
+
+   /**
+   * Delegados registrados que fueron descartados explícitamente durante el proceso.
+   */
+  discardedDelegateIds?: number[];
+
   /**
    * Razón obligatoria solo cuando se envía un delegado manual no registrado
    */
@@ -165,7 +171,7 @@ export interface ManualAuthorizationRequestDto {
 /**
  * Respuesta de autorización manual
  */
-export interface ManualAuthorizationResponseDto {
+export interface ManualAuthorizationCompletedResponseDto {
   qrAuthId: number;
   qrCode: string;
   manualAuthorization: true;
@@ -174,11 +180,40 @@ export interface ManualAuthorizationResponseDto {
   pendingParentApproval?: boolean;
 }
 
+export interface DelegateSummaryDto {
+  id: number;
+  name: string;
+  phone?: string | null;
+  relationshipToStudent?: string | null;
+}
+
+export interface ManualAuthorizationRequiresSelectionResponseDto {
+  manualAuthorization: false;
+  requiresDelegateSelection: true;
+  availableDelegates: DelegateSummaryDto[];
+  message: string;
+  discardedDelegateIds?: number[];
+}
+
+export interface ManualAuthorizationManualDelegatePromptResponseDto {
+  manualAuthorization: false;
+  requiresDelegateSelection: false;
+  allowManualDelegate: true;
+  availableDelegates: DelegateSummaryDto[];
+  message: string;
+  discardedDelegateIds?: number[];
+}
+
+export type ManualAuthorizationResponseDto =
+  | ManualAuthorizationCompletedResponseDto
+  | ManualAuthorizationRequiresSelectionResponseDto
+  | ManualAuthorizationManualDelegatePromptResponseDto;
+  
 /**
  * DTO para filtros de historial
  */
 export interface HistoryFiltersDto {
-   studentId?: number;
+  studentId?: number;
   studentRut?: string;
   status?: string;
   method?: string;

@@ -1,4 +1,7 @@
-import { Model, DataTypes, Sequelize, CreationOptional, Optional, HasManyGetAssociationsMixin, HasManyAddAssociationMixin, HasManyHasAssociationMixin, HasManyCountAssociationsMixin, HasManyCreateAssociationMixin, BelongsToManyGetAssociationsMixin, BelongsToManyAddAssociationMixin, BelongsToManyHasAssociationMixin, BelongsToManyCountAssociationsMixin, BelongsToManyCreateAssociationMixin, BelongsToManyRemoveAssociationMixin, BelongsToManySetAssociationsMixin } from 'sequelize';
+import { Model, DataTypes, Sequelize, CreationOptional, Optional, HasManyGetAssociationsMixin, HasManyAddAssociationMixin, 
+  HasManyHasAssociationMixin, HasManyCountAssociationsMixin, HasManyCreateAssociationMixin, BelongsToManyGetAssociationsMixin, 
+  BelongsToManyAddAssociationMixin, BelongsToManyHasAssociationMixin, BelongsToManyCountAssociationsMixin, BelongsToManyCreateAssociationMixin, 
+  BelongsToManyRemoveAssociationMixin, BelongsToManySetAssociationsMixin, Op } from 'sequelize';
 import sequelizeInstance from '../config/database';
 import UserOrganizationRole from './UserOrganizationRole';
 import Organization from './Organization';
@@ -160,6 +163,12 @@ class User extends Model<UserAttributes, UserCreationAttributes> implements User
     this.hasMany(models.EmergencyContact, {
       foreignKey: 'parentUserId',
       as: 'emergencyContacts',
+      scope: {
+        [Op.or]: [
+          { isSingleUse: false },
+          { singleUseConsumedAt: null }
+        ]
+      },
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
     });

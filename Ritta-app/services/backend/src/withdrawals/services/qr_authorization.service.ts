@@ -4,6 +4,8 @@ import { QrGeneratorUtil } from '../utils/qr_generator.util';
 import { CreateQrAuthorizationData, ManualAuthorizationResponseDto, QrValidationInfoDto } from '../utils/withdrawal.types';
 import { WITHDRAWAL_CONSTANTS } from '../utils/withdrawal.constants';
 
+type DelegateInstance = InstanceType<typeof Delegate>;
+
 export class QrAuthorizationService {
   /**
    * Crear una nueva autorización QR
@@ -295,6 +297,7 @@ export class QrAuthorizationService {
         phone: string;
         relationshipToStudent: string;
       };
+      discardedDelegateIds?: number[];
       unregisteredDelegateReason?: string;
     },
     transaction?: Transaction
@@ -307,7 +310,14 @@ export class QrAuthorizationService {
         {
           model: User,
           as: 'parent',
-          attributes: ['id']
+          attributes: ['id'],
+          include: [
+            {
+              model: Delegate,
+              as: 'delegates',
+              attributes: ['id', 'name', 'phone', 'relationshipToStudent']
+            }
+          ]
         }
       ],
       transaction
@@ -326,12 +336,60 @@ export class QrAuthorizationService {
     if (delegateId && manualDelegate) {
       throw new Error('Debe usar un delegado registrado o ingresar uno manual, no ambos');
     }
+    const parentDelegates = (parent.delegates ?? []) as DelegateInstance[];
+
+    const discardedDelegateIds = Array.isArray(payload.discardedDelegateIds)
+      ? Array.from(new Set(payload.discardedDelegateIds.map((id) => Number(id)))).filter((id) => !Number.isNaN(id))
+      : [];
+
+    discardedDelegateIds.forEach((discardedId) => {
+      const belongsToParent = parentDelegates.some((delegate) => delegate.id === discardedId);
+      if (!belongsToParent) {
+        throw new Error('Uno de los delegados descartados no pertenece al apoderado del estudiante');
+      }
+    });
+
+    const discardedDelegateIdsSet = new Set(discardedDelegateIds);
+
+    const availableDelegates = parentDelegates
+      .filter((delegate) => !discardedDelegateIdsSet.has(delegate.id))
+      .map((delegate) => ({
+        id: delegate.id,
+        name: delegate.name,
+        phone: delegate.phone,
+        relationshipToStudent: delegate.relationshipToStudent
+      }));
+
+    if (!delegateId && !manualDelegate) {
+      if (availableDelegates.length > 0) {
+        return {
+          manualAuthorization: false,
+          requiresDelegateSelection: true,
+          availableDelegates,
+          message: 'Selecciona un delegado registrado para continuar con la autorización manual.',
+          discardedDelegateIds
+        };
+      }
+
+      return {
+        manualAuthorization: false,
+        requiresDelegateSelection: false,
+        allowManualDelegate: true,
+        availableDelegates: [],
+        message:
+          'No hay delegados registrados disponibles. Debes ingresar un delegado extraordinario y registrar la razón correspondiente.',
+        discardedDelegateIds
+      };
+    }
 
     let resolvedDelegateId: number | undefined;
     let pendingParentApproval = false;
     let emergencyContactId: number | undefined;
 
     if (delegateId) {
+      if (discardedDelegateIdsSet.has(delegateId)) {
+        throw new Error('El delegado seleccionado fue marcado como descartado. Actualiza la selección para continuar.');
+      }
       const delegate = await Delegate.findByPk(delegateId, { transaction });
 
       if (!delegate) {
@@ -345,7 +403,22 @@ export class QrAuthorizationService {
       resolvedDelegateId = delegate.id;
     }
 
+    const parentHasDelegates = parentDelegates.length > 0;
+    const hasAvailableDelegates = availableDelegates.length > 0;
+
     if (manualDelegate) {
+      if (parentHasDelegates && hasAvailableDelegates) {
+        throw new Error(
+          'Existen delegados registrados disponibles. Selecciona uno o descártalos explícitamente para habilitar un delegado extraordinario.'
+        );
+      }
+
+      if (parentHasDelegates && !hasAvailableDelegates) {
+        const allDiscarded = parentDelegates.every((delegate) => discardedDelegateIdsSet.has(delegate.id));
+        if (!allDiscarded) {
+          throw new Error('Debes descartar explícitamente a todos los delegados registrados antes de ingresar uno extraordinario.');
+        }
+      }
       pendingParentApproval = true;
       const emergencyContact = await EmergencyContact.create(
         {
@@ -353,7 +426,10 @@ export class QrAuthorizationService {
           name: manualDelegate.name,
           phone: manualDelegate.phone,
           relationship: manualDelegate.relationshipToStudent,
-          isVerified: false
+          isVerified: false,
+          isTemporary: true,
+          isSingleUse: true,
+          singleUseConsumedAt: null
         },
         { transaction }
       );
@@ -419,6 +495,13 @@ export class QrAuthorizationService {
 
     // Notas informativas
     const notesParts: string[] = [];
+    if (discardedDelegateIds.length > 0) {
+      const discardedNames = parentDelegates
+        .filter((delegate) => discardedDelegateIdsSet.has(delegate.id))
+        .map((delegate) => delegate.name)
+        .join(', ');
+      notesParts.push(`Delegados descartados: ${discardedNames}`);
+    }
     if (manualDelegate && unregisteredDelegateReason) {
       notesParts.push(`Razón delegado no registrado: ${unregisteredDelegateReason}`);
     }

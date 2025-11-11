@@ -124,6 +124,20 @@ export const manualAuthorizationSchema = {
     })
       .optional(),
 
+    discardedDelegateIds: Joi.array()
+      .items(
+        Joi.number()
+          .integer()
+          .positive()
+          .messages({
+            'number.base': 'El ID de un delegado descartado debe ser un número',
+            'number.integer': 'El ID de un delegado descartado debe ser un entero',
+            'number.positive': 'El ID de un delegado descartado debe ser positivo'
+          })
+      )
+      .unique()
+      .optional(),
+
     unregisteredDelegateReason: Joi.string()
       .max(500)
       .when('manualDelegate', {
@@ -144,7 +158,7 @@ export const manualAuthorizationSchema = {
           })
       })
   })
-    .xor('delegateId', 'manualDelegate')
+    .nand('delegateId', 'manualDelegate')
     .with('manualDelegate', 'unregisteredDelegateReason')
 };
 

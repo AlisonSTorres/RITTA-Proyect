@@ -10,11 +10,15 @@ export interface EmergencyContactAttributes {
   phone: string;
   relationship: string;
   isVerified: boolean;
+  isTemporary: boolean;
+  isSingleUse: boolean;
+  singleUseConsumedAt: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface EmergencyContactCreationAttributes extends Optional<EmergencyContactAttributes, 'id' | 'isVerified' | 'createdAt' | 'updatedAt'> {}
+export interface EmergencyContactCreationAttributes extends Optional<EmergencyContactAttributes, 
+'id' | 'isVerified' | 'isTemporary' | 'isSingleUse' | 'singleUseConsumedAt' | 'createdAt' | 'updatedAt'> {}
 
 class EmergencyContact extends Model<EmergencyContactAttributes, EmergencyContactCreationAttributes> implements EmergencyContactAttributes {
   public id!: CreationOptional<number>;
@@ -23,6 +27,9 @@ class EmergencyContact extends Model<EmergencyContactAttributes, EmergencyContac
   public phone!: string;
   public relationship!: string;
   public isVerified!: boolean;
+  public isTemporary!: boolean;
+  public isSingleUse!: boolean;
+  public singleUseConsumedAt!: Date | null;
 
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
@@ -69,6 +76,9 @@ export const initEmergencyContactModel = () => {
       phone: { type: DataTypes.STRING(20), allowNull: false },
       relationship: { type: DataTypes.STRING(50), allowNull: false },
       isVerified: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_verified' },
+      isTemporary: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_temporary' },
+      isSingleUse: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_single_use' },
+      singleUseConsumedAt: { type: DataTypes.DATE, allowNull: true, field: 'single_use_consumed_at' },
     },
     {
       sequelize: sequelizeInstance,
