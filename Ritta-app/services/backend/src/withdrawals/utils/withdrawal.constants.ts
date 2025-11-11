@@ -22,6 +22,10 @@ export const WITHDRAWAL_CONSTANTS = {
   QR_ACTION: {
     APPROVE: 'APPROVE',
     DENY: 'DENY'
+    } as const,
+
+  NOTES: {
+    MANUAL_DELEGATE_OVERRIDE_PREFIX: 'Override delegados registrados:'
   } as const
 };
 

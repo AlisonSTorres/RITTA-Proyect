@@ -133,7 +133,9 @@ export class InspectorWithdrawalController {
         delegateId,
         manualDelegate,
         unregisteredDelegateReason,
-        discardedDelegateIds
+        discardedDelegateIds,
+        allowManualDelegateOverride,
+        manualDelegateOverrideReason
       } = req.body;
       const inspectorUserId = req.user?.id;
       
@@ -153,7 +155,6 @@ export class InspectorWithdrawalController {
         });
         return;
       }
-      
         const result = await QrAuthorizationService.authorizeWithoutQr({
         studentId,
         inspectorUserId,
@@ -162,7 +163,9 @@ export class InspectorWithdrawalController {
         delegateId,
         manualDelegate,
         unregisteredDelegateReason,
-        discardedDelegateIds
+        discardedDelegateIds,
+        allowManualDelegateOverride,
+        manualDelegateOverrideReason
       }, transaction);
       
       await transaction.commit();

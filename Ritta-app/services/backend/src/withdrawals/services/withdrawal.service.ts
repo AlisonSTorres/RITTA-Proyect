@@ -24,11 +24,32 @@ import {
 } from '../utils/withdrawal.types';
 import { WITHDRAWAL_CONSTANTS, WithdrawalStatus, WithdrawalMethod } from '../utils/withdrawal.constants';
 import QrAuthorizationService from './qr_authorization.service';
-import {
-  withdrawalEventBus,
-  WithdrawalEvent,
-  ManualApprovalResolvedEventPayload
-} from '../../utils/withdrawal.events';
+import { withdrawalEventBus, WithdrawalEvent } from '../../utils/withdrawal.events';
+const MANUAL_DELEGATE_OVERRIDE_NOTE_PREFIX =
+  WITHDRAWAL_CONSTANTS.NOTES.MANUAL_DELEGATE_OVERRIDE_PREFIX;
+
+const extractManualDelegateOverrideInfo = (
+  notes?: string | null
+): { manualDelegateOverride: boolean; manualDelegateOverrideReason?: string } => {
+  if (!notes) {
+    return { manualDelegateOverride: false };
+  }
+
+  const overrideLine = notes
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.startsWith(MANUAL_DELEGATE_OVERRIDE_NOTE_PREFIX));
+
+  if (!overrideLine) {
+    return { manualDelegateOverride: false };
+  }
+
+  const reason = overrideLine.slice(MANUAL_DELEGATE_OVERRIDE_NOTE_PREFIX.length).trim();
+  return {
+    manualDelegateOverride: true,
+    manualDelegateOverrideReason: reason || undefined
+  };
+};
 
 export class WithdrawalService {
   /**
@@ -507,6 +528,7 @@ export class WithdrawalService {
     });
 
     return withdrawals.map((withdrawal) => ({
+      ...extractManualDelegateOverrideInfo(withdrawal.notes),
       id: withdrawal.id,
       requestedAt: withdrawal.createdAt!,
       notes: withdrawal.notes || undefined,
@@ -629,19 +651,40 @@ export class WithdrawalService {
       if (comment && comment.trim().length > 0) {
         notesParts.push(`Comentario apoderado: ${comment.trim()}`);
       }
+      const trimmedComment = comment?.trim();
 
+      if (trimmedComment && trimmedComment.length > 0) {
+        notesParts.push(`Comentario apoderado: ${trimmedComment}`);
+      }
       withdrawal.notes = notesParts.join('\n');
 
       await withdrawal.save({ transaction });
 
-      await transaction.commit();
-
-      return {
+      const resolution: ManualApprovalResolutionDto = {
         id: withdrawal.id,
         status: withdrawal.status as WithdrawalStatus,
         contactVerified: withdrawal.contactVerified,
         notes: withdrawal.notes || undefined
       };
+      const inspectorUserId = withdrawal.organizationApproverUserId;
+      const resolvedAt = withdrawal.updatedAt || new Date();
+
+      await transaction.commit();
+
+      if (inspectorUserId) {
+        withdrawalEventBus.emit(WithdrawalEvent.MANUAL_APPROVAL_RESOLVED, {
+          withdrawalId: withdrawal.id,
+          inspectorUserId,
+          parentUserId,
+          status: withdrawal.status as WithdrawalStatus,
+          action: normalizedAction,
+          contactVerified: withdrawal.contactVerified,
+          comment: trimmedComment,
+          resolvedAt
+        });
+      }
+
+      return resolution;
     } catch (error) {
       await transaction.rollback();
       throw error;
@@ -783,10 +826,19 @@ export class WithdrawalService {
     const withdrawals = await Withdrawal.findAll({
       where: {
         method: WITHDRAWAL_CONSTANTS.WITHDRAWAL_METHOD.MANUAL,
-        status: WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.PENDING,
-        contactVerified: true,
         organizationApproverUserId: inspectorUserId,
-        retrieverDelegateId: { [Op.ne]: null }
+        guardianAuthorizerUserId: { [Op.ne]: null },
+        [Op.or]: [
+          {
+            status: WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.PENDING,
+            contactVerified: true
+          },
+          {
+            status: WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.DENIED,
+            contactVerified: false,
+            guardianAuthorizerEmergencyContactId: null
+          }
+        ]
       },
       include: [
         {
@@ -806,7 +858,13 @@ export class WithdrawalService {
           model: Delegate,
           as: 'retrieverDelegate',
           attributes: ['id', 'name', 'phone', 'relationshipToStudent'],
-          required: true
+          required: false
+        },
+        {
+          model: EmergencyContact,
+          as: 'retrieverEmergencyContact',
+          attributes: ['id', 'name', 'phone', 'relationship'],
+          required: false
         },
         {
           model: WithdrawalReason,
@@ -824,36 +882,68 @@ export class WithdrawalService {
       order: [['updatedAt', 'DESC']]
     });
 
-    return withdrawals.map((withdrawal) => ({
-      id: withdrawal.id,
-      requestedAt: withdrawal.createdAt!,
-      notes: withdrawal.notes || undefined,
-      student: {
-        id: withdrawal.student!.id,
-        firstName: withdrawal.student!.firstName,
-        lastName: withdrawal.student!.lastName,
-        rut: withdrawal.student!.rut,
-        courseName: withdrawal.student!.course?.name
-      },
-      delegate: {
-        id: withdrawal.retrieverDelegate!.id,
-        name: withdrawal.retrieverDelegate!.name,
-        phone: withdrawal.retrieverDelegate!.phone,
-        relationshipToStudent: withdrawal.retrieverDelegate!.relationshipToStudent
-      },
-      reason: {
-        id: withdrawal.reason!.id,
-        name: withdrawal.reason!.name,
-        customReason: withdrawal.customWithdrawalReason || undefined
-      },
-      guardian: withdrawal.guardianAuthorizerUser
+     return withdrawals.map((withdrawal) => {
+      const delegate = withdrawal.retrieverDelegate;
+      const emergencyContact = withdrawal.retrieverEmergencyContact;
+
+      const delegateInfo = delegate
         ? {
-            id: withdrawal.guardianAuthorizerUser.id,
-            firstName: withdrawal.guardianAuthorizerUser.firstName,
-            lastName: withdrawal.guardianAuthorizerUser.lastName
-          }
-        : undefined
-    }));
+             id: delegate.id,
+            name: delegate.name,
+            phone: delegate.phone,
+            rut: withdrawal.retrieverRutIfOther || null,
+            relationshipToStudent: delegate.relationshipToStudent
+        }: {
+            id: emergencyContact?.id ?? null,
+            name:
+              emergencyContact?.name ||
+              withdrawal.retrieverNameIfOther ||
+              'Delegado extraordinario',
+            phone: emergencyContact?.phone ?? null,
+            rut: withdrawal.retrieverRutIfOther || null,
+            relationshipToStudent:
+              emergencyContact?.relationship ||
+              withdrawal.retrieverRelationshipIfOther ||
+              null
+          };
+
+      const parentAction = withdrawal.guardianAuthorizerEmergencyContactId
+        ? WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.APPROVE
+        : withdrawal.guardianAuthorizerUserId
+        ? WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.DENY
+        : undefined;
+
+      return {
+        ...extractManualDelegateOverrideInfo(withdrawal.notes),
+        id: withdrawal.id,
+        requestedAt: withdrawal.createdAt!,
+        decisionAt: withdrawal.updatedAt!,
+        status: withdrawal.status as WithdrawalStatus,
+        contactVerified: withdrawal.contactVerified,
+        parentAction,
+        notes: withdrawal.notes || undefined,
+        student: {
+          id: withdrawal.student!.id,
+          firstName: withdrawal.student!.firstName,
+          lastName: withdrawal.student!.lastName,
+          rut: withdrawal.student!.rut,
+          courseName: withdrawal.student!.course?.name
+        },
+        delegate: delegateInfo,
+        reason: {
+          id: withdrawal.reason!.id,
+          name: withdrawal.reason!.name,
+          customReason: withdrawal.customWithdrawalReason || undefined
+        },
+        guardian: withdrawal.guardianAuthorizerUser
+          ? {
+              id: withdrawal.guardianAuthorizerUser.id,
+              firstName: withdrawal.guardianAuthorizerUser.firstName,
+              lastName: withdrawal.guardianAuthorizerUser.lastName
+            }
+          : undefined
+      };
+    });
   }
 
   /**
@@ -874,25 +964,30 @@ export class WithdrawalService {
         status: WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.PENDING,
         contactVerified: true,
         organizationApproverUserId: inspectorUserId,
-        retrieverDelegateId: { [Op.ne]: null }
+        [Op.or]: [
+          { retrieverDelegateId: { [Op.ne]: null } },
+          { retrieverEmergencyContactId: { [Op.ne]: null } }
+        ]
       }
     });
 
     if (!withdrawal) {
       throw new Error('Solicitud confirmada no encontrada');
     }
-
+    const normalizedAction = action?.toUpperCase() as ManualApprovalAction;
+    
     const notesParts: string[] = [];
     if (withdrawal.notes) {
       notesParts.push(withdrawal.notes);
     }
 
-    if (action === WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.APPROVE || action === 'DENY') {
-      notesParts.push('Inspector rechazó el retiro tras la confirmación.');
+    if (normalizedAction === WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.APPROVE) {
+      notesParts.push('Inspector autorizó el retiro tras confirmación del apoderado.');
       withdrawal.status = WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.APPROVED;
     } else {
-      notesParts.push('Inspector autorizó el retiro tras confirmación del apoderado.');
+      notesParts.push('Inspector rechazó el retiro tras la confirmación.');
       withdrawal.status = WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.DENIED;
+       withdrawal.contactVerified = false;
     }
 
     if (comment && comment.trim().length > 0) {

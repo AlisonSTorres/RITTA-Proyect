@@ -48,6 +48,8 @@ export interface ManualAuthorizationPayload {
   manualDelegate?: ManualDelegatePayload;
   unregisteredDelegateReason?: string;
   discardedDelegateIds?: number[];
+  allowManualDelegateOverride?: boolean;
+  manualDelegateOverrideReason?: string | null;
 }
 
 // Función para autorizar manualmente un retiro sin QR

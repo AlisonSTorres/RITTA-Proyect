@@ -299,11 +299,25 @@ export class QrAuthorizationService {
       };
       discardedDelegateIds?: number[];
       unregisteredDelegateReason?: string;
+      allowManualDelegateOverride?: boolean;
+      manualDelegateOverrideReason?: string;
     },
     transaction?: Transaction
   ): Promise<ManualAuthorizationResponseDto> {
-    const { studentId, inspectorUserId, reasonId, customReason, delegateId, manualDelegate, unregisteredDelegateReason } =
-      payload;
+    const {
+      studentId,
+      inspectorUserId,
+      reasonId,
+      customReason,
+      delegateId,
+      manualDelegate,
+      unregisteredDelegateReason,
+      allowManualDelegateOverride,
+      manualDelegateOverrideReason
+    } = payload;
+
+    const normalizedManualDelegateOverrideReason = manualDelegateOverrideReason?.trim() || '';
+    const forceManualDelegate = Boolean(allowManualDelegateOverride);
 
     const student = await Student.findByPk(studentId, {
       include: [
@@ -335,6 +349,10 @@ export class QrAuthorizationService {
 
     if (delegateId && manualDelegate) {
       throw new Error('Debe usar un delegado registrado o ingresar uno manual, no ambos');
+    }
+
+     if (forceManualDelegate && !manualDelegate) {
+      throw new Error('No se puede forzar un delegado extraordinario sin proporcionar sus datos.');
     }
     const parentDelegates = (parent.delegates ?? []) as DelegateInstance[];
 
@@ -408,12 +426,20 @@ export class QrAuthorizationService {
 
     if (manualDelegate) {
       if (parentHasDelegates && hasAvailableDelegates) {
-        throw new Error(
-          'Existen delegados registrados disponibles. Selecciona uno o descártalos explícitamente para habilitar un delegado extraordinario.'
-        );
+        if (!forceManualDelegate) {
+          throw new Error(
+            'Existen delegados registrados disponibles. Selecciona uno o descártalos explícitamente para habilitar un delegado extraordinario.'
+          );
+        }
+
+        if (!normalizedManualDelegateOverrideReason) {
+          throw new Error(
+            'Debes registrar una justificación para autorizar a un delegado extraordinario cuando existen delegados registrados disponibles.'
+          );
+        }
       }
 
-      if (parentHasDelegates && !hasAvailableDelegates) {
+       if (!forceManualDelegate && parentHasDelegates && !hasAvailableDelegates) {
         const allDiscarded = parentDelegates.every((delegate) => discardedDelegateIdsSet.has(delegate.id));
         if (!allDiscarded) {
           throw new Error('Debes descartar explícitamente a todos los delegados registrados antes de ingresar uno extraordinario.');
@@ -505,6 +531,12 @@ export class QrAuthorizationService {
     if (manualDelegate && unregisteredDelegateReason) {
       notesParts.push(`Razón delegado no registrado: ${unregisteredDelegateReason}`);
     }
+    if (manualDelegate && forceManualDelegate && parentHasDelegates && hasAvailableDelegates) {
+      const overrideReasonText = normalizedManualDelegateOverrideReason || 'Sin motivo especificado';
+      notesParts.push(
+        `${WITHDRAWAL_CONSTANTS.NOTES.MANUAL_DELEGATE_OVERRIDE_PREFIX} ${overrideReasonText}`
+      );
+    }
     if (manualDelegate) {
       notesParts.push(
         `Delegado extraordinario: ${manualDelegate.name} (${manualDelegate.relationshipToStudent})`
@@ -512,6 +544,8 @@ export class QrAuthorizationService {
       notesParts.push(`Teléfono delegado: ${manualDelegate.phone}`);
       notesParts.push(`RUT delegado: ${manualDelegate.rut}`);
     }
+    
+    const shouldPersistManualRetrieverAsOther = Boolean(manualDelegate && !emergencyContactId);
 
     await Withdrawal.create(
       {
@@ -527,9 +561,11 @@ export class QrAuthorizationService {
         retrieverUserId: null,
         retrieverDelegateId: resolvedDelegateId ?? null,
         retrieverEmergencyContactId: emergencyContactId ?? null,
-        retrieverNameIfOther: manualDelegate ? manualDelegate.name : null,
-        retrieverRutIfOther: manualDelegate ? manualDelegate.rut : null,
-        retrieverRelationshipIfOther: manualDelegate ? manualDelegate.relationshipToStudent : null,
+        retrieverNameIfOther: shouldPersistManualRetrieverAsOther ? manualDelegate!.name : null,
+        retrieverRutIfOther: shouldPersistManualRetrieverAsOther ? manualDelegate!.rut : null,
+        retrieverRelationshipIfOther: shouldPersistManualRetrieverAsOther
+          ? manualDelegate!.relationshipToStudent
+          : null,
         customWithdrawalReason: customReason || null,
         notes: notesParts.length ? notesParts.join('\n') : null,
         withdrawalTime: new Date()
