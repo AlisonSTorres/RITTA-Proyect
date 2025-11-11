@@ -236,6 +236,8 @@ export default function ManualEntryScreen() {
       selectedDelegate,
       manualDelegate: trimmedManualDelegate,
       unregisteredDelegateReason: showManualDelegateForm ? unregisteredDelegateReason.trim() : null,
+      allowManualDelegateOverride: showManualDelegateForm && delegates.length > 0,
+      manualDelegateOverrideReason: showManualDelegateForm && delegates.length > 0 ? unregisteredDelegateReason.trim() : null,
     };
 
     setData(withdrawalData);

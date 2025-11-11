@@ -291,6 +291,10 @@ ALTER SEQUENCE public.delegates_id_seq OWNED BY public.delegates.id;
 -- Name: emergency_contacts; Type: TABLE; Schema: public; Owner: -
 --
 
+--
+-- Name: emergency_contacts; Type: TABLE; Schema: public; Owner: -
+--
+
 CREATE TABLE public.emergency_contacts (
     id integer NOT NULL,
     parent_user_id integer NOT NULL,
@@ -298,6 +302,9 @@ CREATE TABLE public.emergency_contacts (
     phone character varying(20) NOT NULL,
     relationship character varying(50) NOT NULL,
     is_verified boolean DEFAULT false,
+    is_temporary boolean DEFAULT false,
+    is_single_use boolean DEFAULT false,
+    single_use_consumed_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone
 );

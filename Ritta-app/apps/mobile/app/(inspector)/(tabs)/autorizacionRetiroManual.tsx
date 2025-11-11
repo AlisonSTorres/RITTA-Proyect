@@ -39,9 +39,10 @@ export default function ValidacionRetiroScreen() {
     selectedDelegate,
     manualDelegate,
     unregisteredDelegateReason,
+    allowManualDelegateOverride,
+    manualDelegateOverrideReason,
   } = pickupData;
 
-  // Mostrar el motivo o "OTRO (ESPECIFICAR)" si es necesario
   const displayedReason = withdrawalReason.reasonName.startsWith('OTRO') 
     ? `${withdrawalReason.reasonName} - ${withdrawalReason.customReason}` 
     : withdrawalReason.reasonName;
@@ -73,6 +74,12 @@ export default function ValidacionRetiroScreen() {
       if (unregisteredDelegateReason) {
         payload.unregisteredDelegateReason = unregisteredDelegateReason;
       }
+      if (allowManualDelegateOverride) {
+        payload.allowManualDelegateOverride = true;
+        if (manualDelegateOverrideReason) {
+          payload.manualDelegateOverrideReason = manualDelegateOverrideReason;
+        }
+      }
     }
 
     setLoading(true);
@@ -98,6 +105,7 @@ export default function ValidacionRetiroScreen() {
         setModalMessage('Se ha cancelado la operación, volviendo al menu principal.');
       }
       setModalVisible(true);
+
     } catch (error) {
       console.error('Error al autorizar el retiro:', error);
       setModalTitle('Error');
@@ -108,13 +116,12 @@ export default function ValidacionRetiroScreen() {
     }
   };
 
-
 // Redirigir al usuario a la pantalla de inicio después de cerrar el modal
   const handleModalClose = () => {
     router.push('/home');
     setData({});
     setLoading(false);
-    setModalVisible(false);
+    setModalVisible(false); 
   };
 
   return (
@@ -127,17 +134,17 @@ export default function ValidacionRetiroScreen() {
             <Ionicons name="warning" size={32} color="#facc15" />
           </View>
 
-          <Text className="text-sm font-bold mb-2 text-center text-red-600">
-            Información de retiro
-            </Text>
+          <Text className="text-sm font-bold mb-2 text-center text-red-600">Información de retiro</Text>
 
-          <ScrollView style={{ maxHeight: 350 }} contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={true}>
-            {/* Mostrar el motivo de retiro */}
+           <ScrollView
+            style={{ maxHeight: 360 }}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            showsVerticalScrollIndicator={true}
+          >
             <Text className="text-sm mb-2 text-center">
               <Text className="font-bold">Motivo:</Text> {displayedReason}
             </Text>
 
-            {/* Información del estudiante */}
             <View className="mb-3">
               <Text className="text-sm font-bold mb-1 text-red-600">Estudiante</Text>
               <PickupInfoCard
@@ -147,7 +154,6 @@ export default function ValidacionRetiroScreen() {
               />
             </View>
 
-            {/* Información del delegado autorizado */}
             {displayedDelegate && (
               <View className="mb-3">
                 <Text className="text-sm font-bold mb-1 text-red-600">{delegateTitle}</Text>
@@ -157,10 +163,10 @@ export default function ValidacionRetiroScreen() {
                   phone={displayedDelegate.phone || authorizedParent?.phone || undefined}
                   relation={displayedDelegate.relationshipToStudent}
                 />
-                {manualDelegate && unregisteredDelegateReason ? (
+                {manualDelegate && (manualDelegateOverrideReason || unregisteredDelegateReason) ? (
                   <Text className="text-xs text-gray-600 mt-1">
                     <Text className="font-semibold">Razón delegado no registrado: </Text>
-                    {unregisteredDelegateReason}
+                    {manualDelegateOverrideReason || unregisteredDelegateReason}
                   </Text>
                 ) : null}
               </View>
@@ -168,8 +174,8 @@ export default function ValidacionRetiroScreen() {
           </ScrollView>
         </View>
 
-        <Text className="text-xs text-gray-500 text-center mt-2">
-          (*) Solicitar autorizacin al operador para validar su identidad.
+         <Text className="text-xs text-gray-500 text-center mt-2">
+          (*) Solicitar autorización al operador para validar su identidad.
         </Text>
         {requiresParentApproval && (
           <Text className="text-xs text-gray-500 text-center mt-1">
@@ -177,36 +183,30 @@ export default function ValidacionRetiroScreen() {
           </Text>
         )}
 
-
         <View className="mt-2 flex-row space-x-2">
-          {/* Botón de autorizar */}
-          <TouchableOpacity 
-            className="bg-green-600 py-2 px-4 rounded-lg" 
-            onPress={() => handleAuthorization('authorized')} 
-            disabled={loading}  // Deshabilita el botón cuando está cargando
-          >
+         <TouchableOpacity
+            className="bg-green-600 py-2 px-4 rounded-lg"
+            onPress={() => handleAuthorization('authorized')}
+            disabled={loading}>
             <Text className="text-white font-medium">
               {requiresParentApproval ? 'Enviar autorizacin' : 'Autorizar'}
             </Text>
           </TouchableOpacity>
 
-          {/* Botón de denegar */}
-          <TouchableOpacity 
-            className="bg-red-600 py-2 px-4 rounded-lg" 
-            onPress={() => handleAuthorization('denied')} 
-            disabled={loading}  // Deshabilita el botón cuando está cargando
+          <TouchableOpacity
+            className="bg-red-600 py-2 px-4 rounded-lg"
+            onPress={() => handleAuthorization('denied')}
+            disabled={loading}
           >
             <Text className="text-white font-medium">Cancelar</Text>
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Modal de alerta */}
       <AlertModal
         visible={modalVisible}
         title={modalTitle || 'Resultado'}
         message={modalMessage || 'Operación exitosa'}
-        onClose={handleModalClose}  // Redirige a /home cuando se cierra el modal
+        onClose={handleModalClose}
       />
     </GlobalBackground>
   );

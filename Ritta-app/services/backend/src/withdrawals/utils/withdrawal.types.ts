@@ -166,7 +166,18 @@ export interface ManualAuthorizationRequestDto {
    * Razón obligatoria solo cuando se envía un delegado manual no registrado
    */
   unregisteredDelegateReason?: string;
+  
+  /**
+   * Permite forzar el uso de un delegado extraordinario aunque existan delegados disponibles.
+   */
+  allowManualDelegateOverride?: boolean;
+
+  /**
+   * Justificación registrada cuando se fuerza el uso de un delegado extraordinario.
+   */
+  manualDelegateOverrideReason?: string;
 }
+
 
 /**
  * Respuesta de autorización manual
@@ -323,6 +334,8 @@ export interface PendingManualApprovalDto {
   id: number;
   requestedAt: Date;
   notes?: string;
+  manualDelegateOverride?: boolean;
+  manualDelegateOverrideReason?: string;
   student: {
     id: number;
     firstName: string;
@@ -347,6 +360,8 @@ export interface InspectorManualApprovalDto {
   id: number;
   requestedAt: Date;
   notes?: string;
+  manualDelegateOverride?: boolean;
+  manualDelegateOverrideReason?: string;
   student: {
     id: number;
     firstName: string;

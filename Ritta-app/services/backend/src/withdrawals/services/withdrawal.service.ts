@@ -29,6 +29,31 @@ import {
   WithdrawalEvent,
   ManualApprovalResolvedEventPayload
 } from '../../utils/withdrawal.events';
+const MANUAL_DELEGATE_OVERRIDE_NOTE_PREFIX =
+  WITHDRAWAL_CONSTANTS.NOTES.MANUAL_DELEGATE_OVERRIDE_PREFIX;
+
+const extractManualDelegateOverrideInfo = (
+  notes?: string | null
+): { manualDelegateOverride: boolean; manualDelegateOverrideReason?: string } => {
+  if (!notes) {
+    return { manualDelegateOverride: false };
+  }
+
+  const overrideLine = notes
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.startsWith(MANUAL_DELEGATE_OVERRIDE_NOTE_PREFIX));
+
+  if (!overrideLine) {
+    return { manualDelegateOverride: false };
+  }
+
+  const reason = overrideLine.slice(MANUAL_DELEGATE_OVERRIDE_NOTE_PREFIX.length).trim();
+  return {
+    manualDelegateOverride: true,
+    manualDelegateOverrideReason: reason || undefined
+  };
+};
 
 export class WithdrawalService {
   /**
@@ -507,6 +532,7 @@ export class WithdrawalService {
     });
 
     return withdrawals.map((withdrawal) => ({
+      ...extractManualDelegateOverrideInfo(withdrawal.notes),
       id: withdrawal.id,
       requestedAt: withdrawal.createdAt!,
       notes: withdrawal.notes || undefined,
@@ -825,6 +851,7 @@ export class WithdrawalService {
     });
 
     return withdrawals.map((withdrawal) => ({
+      ...extractManualDelegateOverrideInfo(withdrawal.notes),
       id: withdrawal.id,
       requestedAt: withdrawal.createdAt!,
       notes: withdrawal.notes || undefined,

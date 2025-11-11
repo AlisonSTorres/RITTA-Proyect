@@ -19,6 +19,8 @@ type PendingApproval = {
   id: number;
   requestedAt: string;
   notes?: string;
+  manualDelegateOverride?: boolean;
+  manualDelegateOverrideReason?: string;
   student: {
     firstName: string;
     lastName: string;
@@ -159,6 +161,16 @@ export default function NotificacionesScreen() {
           ) : null}
         </View>
 
+        {item.manualDelegateOverride ? (
+          <View className="mb-3 bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+            <Text className="text-xs font-semibold text-yellow-700">Delegado extraordinario forzado</Text>
+            <Text className="text-sm text-yellow-700 mt-1">
+              {item.manualDelegateOverrideReason
+                ? item.manualDelegateOverrideReason
+                : 'El inspector solicitó un delegado extraordinario a pesar de existir delegados registrados disponibles.'}
+            </Text>
+          </View>
+        ) : null}
         {item.notes ? (
           <View className="mb-3">
             <Text className="text-xs font-semibold text-gray-500">Notas</Text>

@@ -39,6 +39,8 @@ export default function ValidacionRetiroScreen() {
     selectedDelegate,
     manualDelegate,
     unregisteredDelegateReason,
+    allowManualDelegateOverride,
+    manualDelegateOverrideReason,
   } = pickupData;
 
   const displayedReason = withdrawalReason.reasonName.startsWith('OTRO') 
@@ -72,6 +74,12 @@ export default function ValidacionRetiroScreen() {
       if (unregisteredDelegateReason) {
         payload.unregisteredDelegateReason = unregisteredDelegateReason;
       }
+      if (allowManualDelegateOverride) {
+        payload.allowManualDelegateOverride = true;
+        if (manualDelegateOverrideReason) {
+          payload.manualDelegateOverrideReason = manualDelegateOverrideReason;
+        }
+      }
     }
 
     setLoading(true);
@@ -97,6 +105,7 @@ export default function ValidacionRetiroScreen() {
         setModalMessage('Se ha cancelado la operación, volviendo al menu principal.');
       }
       setModalVisible(true);
+
     } catch (error) {
       console.error('Error al autorizar el retiro:', error);
       setModalTitle('Error');
@@ -154,10 +163,10 @@ export default function ValidacionRetiroScreen() {
                   phone={displayedDelegate.phone || authorizedParent?.phone || undefined}
                   relation={displayedDelegate.relationshipToStudent}
                 />
-                {manualDelegate && unregisteredDelegateReason ? (
+                {manualDelegate && (manualDelegateOverrideReason || unregisteredDelegateReason) ? (
                   <Text className="text-xs text-gray-600 mt-1">
                     <Text className="font-semibold">Razón delegado no registrado: </Text>
-                    {unregisteredDelegateReason}
+                    {manualDelegateOverrideReason || unregisteredDelegateReason}
                   </Text>
                 ) : null}
               </View>

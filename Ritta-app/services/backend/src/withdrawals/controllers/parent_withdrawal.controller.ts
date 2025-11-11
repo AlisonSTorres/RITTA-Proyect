@@ -363,10 +363,14 @@ export class ParentWithdrawalController {
       }
 
       const approvals = await WithdrawalService.getPendingManualApprovals(parentUserId);
-
+      const normalizedApprovals = approvals.map((approval) => ({
+        ...approval,
+        manualDelegateOverride: Boolean(approval.manualDelegateOverride),
+        manualDelegateOverrideReason: approval.manualDelegateOverrideReason || undefined
+      }));
       res.status(200).json({
         success: true,
-        data: approvals,
+        data: normalizedApprovals,
         message: 'Solicitudes pendientes obtenidas exitosamente'
       });
     } catch (error) {

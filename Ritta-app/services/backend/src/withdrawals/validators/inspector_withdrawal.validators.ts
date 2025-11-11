@@ -156,10 +156,35 @@ export const manualAuthorizationSchema = {
           .messages({
             'string.max': 'La razón del delegado no registrado no puede exceder 500 caracteres'
           })
+           }),
+
+    allowManualDelegateOverride: Joi.boolean().optional(),
+
+    manualDelegateOverrideReason: Joi.string()
+      .max(500)
+      .when('allowManualDelegateOverride', {
+        is: Joi.valid(true),
+        then: Joi.string()
+          .trim()
+          .min(1)
+          .required()
+          .messages({
+            'any.required': 'Debes registrar la justificación para forzar un delegado extraordinario.',
+            'string.empty': 'La justificación para forzar un delegado extraordinario no puede estar vacía.',
+            'string.max': 'La justificación para forzar un delegado extraordinario no puede exceder 500 caracteres'
+          }),
+        otherwise: Joi.string()
+          .max(500)
+          .optional()
+          .allow('')
+          .messages({
+            'string.max': 'La justificación para forzar un delegado extraordinario no puede exceder 500 caracteres'
+          })
       })
   })
     .nand('delegateId', 'manualDelegate')
     .with('manualDelegate', 'unregisteredDelegateReason')
+    .with('allowManualDelegateOverride', 'manualDelegate')
 };
 
 /**
