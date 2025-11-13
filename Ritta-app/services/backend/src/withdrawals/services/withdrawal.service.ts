@@ -980,11 +980,11 @@ export class WithdrawalService {
       notesParts.push(withdrawal.notes);
     }
 
-    if (action === WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.APPROVE || action === 'DENY') {
-      notesParts.push('Inspector rechazó el retiro tras la confirmación.');
+    if (action === WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.APPROVE) {
+      notesParts.push('Inspector autorizó el retiro tras confirmación del apoderado.');
       withdrawal.status = WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.APPROVED;
     } else {
-      notesParts.push('Inspector autorizó el retiro tras confirmación del apoderado.');
+     notesParts.push('Inspector rechazó el retiro tras la confirmación.');
       withdrawal.status = WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.DENIED;
     }
 

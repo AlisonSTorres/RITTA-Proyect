@@ -12,7 +12,7 @@ import { router } from 'expo-router';
 export default function ValidacionRetiroScreen() {
   const { data: pickupData, setData } = useAppContext();
   const [loading, setLoading] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);  // Estado para el modal
+  const [modalVisible, setModalVisible] = useState(false); 
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
 

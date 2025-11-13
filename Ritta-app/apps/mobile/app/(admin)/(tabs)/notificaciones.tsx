@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   fetchInspectorPendingApprovals,
@@ -112,12 +113,21 @@ export default function InspectorNotificationsScreen() {
 
   const confirmDecision = (withdrawalId: number, action: 'APPROVE' | 'DENY') => {
     const actionText = action === 'APPROVE' ? 'autorizar' : 'rechazar';
+    
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' && window.confirm(`¿Deseas ${actionText} este retiro?`);
+      if (confirmed) {
+        void handleDecision(withdrawalId, action);
+      }
+      return;
+    }
+
     Alert.alert(
       'Confirmar',
-      '¿Deseas  este retiro?',
+      `¿Deseas ${actionText} este retiro?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sí', onPress: () => handleDecision(withdrawalId, action) },
+        { text: 'Aprobar', onPress: () => void handleDecision(withdrawalId, action) },
       ],
       { cancelable: true },
     );
