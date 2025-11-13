@@ -4,7 +4,6 @@ import GlobalBackground from '@/components/layout/GlobalBackground';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons'; 
 
-//!!!!!!!!!! REDIRECCIONAR CORRECTAMENTE UNA VEZ ESTEN LISTAS LAS VISTAS !!!!!!!!!!
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -38,14 +37,20 @@ export default function HomeScreen() {
         <Text className="text-2xl font-bold text-blue-700 mb-3 mt-6">Opciones</Text>
 
         <OptionButton
-          title="Mi perfil" 
+          title="Mi perfil"
           onPress={() => router.navigate('/perfil')}
-          icon={<Ionicons name="person" size={30} color="#1D4ED8" />} 
+          icon={<Ionicons name="person" size={30} color="#1D4ED8" />}
+        />
+
+        <OptionButton
+          title="Notificaciones"
+          onPress={() => router.navigate('/notificaciones')}
+          icon={<Ionicons name="notifications-outline" size={30} color="#1D4ED8" />}
         />
 
         <OptionButton
           title="Historial de Retiros"
-          //onPress={() => router.navigate('/historialRetiros')}
+          onPress={() => router.navigate('/historialRetiros')}
           icon={<Ionicons name="time-outline" size={30} color="#1D4ED8" />}
         />
 
