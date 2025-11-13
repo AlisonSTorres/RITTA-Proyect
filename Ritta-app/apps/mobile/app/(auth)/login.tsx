@@ -9,7 +9,7 @@ import PrimaryButton from '@/components/ui/buttons/PrimaryButton';
 import TextLinkButton from '@/components/ui/buttons/TextLinkButton';
 import RecaptchaModal from '@/components/security/RecaptchaModal';
 import type { DetailedApiError } from '@/services/api';
-
+import Constants from 'expo-constants';
 const isDetailedApiError = (error: unknown): error is DetailedApiError => {
   return (
     error instanceof Error &&
@@ -25,9 +25,39 @@ export default function LoginScreen() {
  const [isSubmitting, setIsSubmitting] = useState(false);
   const [captchaVisible, setCaptchaVisible] = useState(false);
   const [captchaMessage, setCaptchaMessage] = useState<string | null>(null);
+const recaptchaSiteKey = useMemo(() => {
+    const candidates: unknown[] = [];
 
-  const recaptchaSiteKey = useMemo(() => process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY ?? '', []);
+    if (typeof process !== 'undefined') {
+      candidates.push(process.env?.EXPO_PUBLIC_RECAPTCHA_SITE_KEY);
+    }
 
+    const expoExtra = (Constants?.expoConfig?.extra ?? {}) as Record<string, unknown>;
+    const manifestExtra = (Constants?.manifest?.extra ?? {}) as Record<string, unknown>;
+    const globalEnv =
+      (globalThis as Record<string, unknown> | undefined)?.['EXPO_PUBLIC_RECAPTCHA_SITE_KEY'];
+
+    candidates.push(
+      expoExtra.recaptchaSiteKey,
+      expoExtra.captchaSiteKey,
+      expoExtra.EXPO_PUBLIC_RECAPTCHA_SITE_KEY,
+      manifestExtra.recaptchaSiteKey,
+      manifestExtra.captchaSiteKey,
+      manifestExtra.EXPO_PUBLIC_RECAPTCHA_SITE_KEY,
+      globalEnv,
+    );
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed.length > 0) {
+          return trimmed;
+        }
+      }
+    }
+
+    return '';
+  }, []);
   const markCaptchaRequired = useCallback((message?: string) => {
     if (!recaptchaSiteKey) {
       const warningMessage =

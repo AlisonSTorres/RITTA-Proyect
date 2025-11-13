@@ -24,6 +24,48 @@ interface AppConfig {
   RECAPTCHA_V3_SECRET_KEY?: string;
   RECAPTCHA_V3_THRESHOLD?: number;
 }
+const sanitizeString = (value?: string): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const parseRecaptchaThreshold = (value?: string): number => {
+  if (!value) {
+    return 0.5;
+  }
+
+  const parsed = Number.parseFloat(value);
+
+  if (!Number.isFinite(parsed)) {
+    console.warn(
+      `ADVERTENCIA: RECAPTCHA_V3_THRESHOLD='${value}' no es un número válido. Se usará el valor por defecto 0.5.`,
+    );
+    return 0.5;
+  }
+
+  if (parsed < 0 || parsed > 1) {
+    console.warn(
+      `ADVERTENCIA: RECAPTCHA_V3_THRESHOLD='${value}' está fuera del rango permitido (0-1). Se usará el valor por defecto 0.5.`,
+    );
+    return 0.5;
+  }
+
+  return parsed;
+};
+
+const rawRecaptchaSecret = process.env.RECAPTCHA_V3_SECRET_KEY;
+const sanitizedRecaptchaSecret = sanitizeString(rawRecaptchaSecret);
+
+if (rawRecaptchaSecret && !sanitizedRecaptchaSecret) {
+  console.warn(
+    'ADVERTENCIA: RECAPTCHA_V3_SECRET_KEY está definida pero queda vacía tras eliminar espacios. Se ignorará el valor.',
+  );
+}
+
 
 const config: AppConfig = {
   NODE_ENV: process.env.NODE_ENV ?? 'development',
@@ -43,8 +85,8 @@ const config: AppConfig = {
   EMAIL_PASS: process.env.EMAIL_PASS, 
   EMAIL_FROM: process.env.EMAIL_FROM ?? '"RITTA" <no-reply@ritta.com>',
   
-  RECAPTCHA_V3_SECRET_KEY: process.env.RECAPTCHA_V3_SECRET_KEY,
-  RECAPTCHA_V3_THRESHOLD: parseFloat(process.env.RECAPTCHA_V3_THRESHOLD ?? '0.5') || 0.5,
+  RECAPTCHA_V3_SECRET_KEY: sanitizedRecaptchaSecret,
+  RECAPTCHA_V3_THRESHOLD: parseRecaptchaThreshold(process.env.RECAPTCHA_V3_THRESHOLD),
 };
 
 if (!process.env.DB_NAME) {
@@ -68,6 +110,9 @@ if (!config.EMAIL_HOST || !config.EMAIL_USER || !config.EMAIL_PASS) {
 }
 if (config.NODE_ENV === 'production' && !config.RECAPTCHA_V3_SECRET_KEY) {
     console.warn('ADVERTENCIA: RECAPTCHA_V3_SECRET_KEY no está definida en .env para producción.');
+}
+if (config.RECAPTCHA_V3_SECRET_KEY && rawRecaptchaSecret !== config.RECAPTCHA_V3_SECRET_KEY) {
+  console.info('INFO: RECAPTCHA_V3_SECRET_KEY se normalizó eliminando espacios en blanco.');
 }
 
 
