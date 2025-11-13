@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   fetchPendingManualApprovals,
@@ -61,18 +62,24 @@ export default function NotificacionesScreen() {
   const [actionId, setActionId] = useState<number | null>(null);
 
   const loadApprovals = useCallback(
-    async (showSpinner = false) => {
+    async ({ showSpinner = false, silentOnError = false }: { showSpinner?: boolean; silentOnError?: boolean } = {}) => {
+      let success = false;
+
       try {
         if (showSpinner) {
           setLoading(true);
         } else {
           setRefreshing(true);
         }
+
         const data = await fetchPendingManualApprovals();
         setApprovals(Array.isArray(data) ? data : []);
+        success = true;
       } catch (error: any) {
-        const message = error?.message || 'No se pudieron cargar las solicitudes pendientes';
-        Alert.alert('Error', message);
+         if (!silentOnError) {
+          const message = error?.message || 'No se pudieron cargar las solicitudes pendientes';
+          Alert.alert('Error', message);
+        }
       } finally {
         if (showSpinner) {
           setLoading(false);
@@ -80,13 +87,14 @@ export default function NotificacionesScreen() {
           setRefreshing(false);
         }
       }
+      return success;
     },
     [],
   );
 
   useFocusEffect(
     useCallback(() => {
-      loadApprovals(true);
+      loadApprovals({ showSpinner: true });
       return undefined;
     }, [loadApprovals]),
   );
@@ -96,12 +104,17 @@ export default function NotificacionesScreen() {
       setActionId(withdrawalId);
       await resolveManualApprovalRequest(withdrawalId, action);
       setApprovals(prev => prev.filter(item => item.id !== withdrawalId));
-      Alert.alert(
-        'Operación exitosa',
+      const refreshed = await loadApprovals({ silentOnError: true });
+      const baseMessage =
         action === 'APPROVE'
           ? 'Has aprobado al delegado extraordinario.'
-          : 'Has rechazado la autorización solicitada.',
-      );
+            : 'Has rechazado la autorización solicitada.';
+      const message = refreshed
+        ? baseMessage
+        : `${baseMessage} No se pudo actualizar la lista automáticamente, por favor refresca manualmente.`;
+
+      Alert.alert('Operación exitosa', message);
+
     } catch (error: any) {
       const message = error?.message || 'No se pudo procesar tu respuesta.';
       Alert.alert('Error', message);
@@ -112,12 +125,19 @@ export default function NotificacionesScreen() {
 
   const confirmDecision = (withdrawalId: number, action: 'APPROVE' | 'DENY') => {
     const actionText = action === 'APPROVE' ? 'aprobar' : 'rechazar';
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' && window.confirm(`¿Deseas ${actionText} esta solicitud?`);
+      if (confirmed) {
+        void performDecision(withdrawalId, action);
+      }
+      return;
+    }
     Alert.alert(
       'Confirmar',
       `¿Deseas ${actionText} esta solicitud?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sí', onPress: () => performDecision(withdrawalId, action) },
+        { text: 'Sí', onPress: () => void performDecision(withdrawalId, action) },
       ],
       { cancelable: true },
     );
@@ -232,7 +252,7 @@ export default function NotificacionesScreen() {
         className="flex-1 w-full"
         contentContainerStyle={{ paddingBottom: 32 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => loadApprovals(false)} />
+           <RefreshControl refreshing={refreshing} onRefresh={() => loadApprovals({})} />
         }
       >
         {approvals.map(renderCard)}
