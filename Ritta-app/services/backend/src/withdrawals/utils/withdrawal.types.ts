@@ -362,6 +362,7 @@ export interface InspectorManualApprovalDto {
   notes?: string;
   manualDelegateOverride?: boolean;
   manualDelegateOverrideReason?: string;
+  
   status: WithdrawalStatus;
   contactVerified: boolean;
   parentAction?: ManualApprovalAction;

@@ -974,20 +974,18 @@ export class WithdrawalService {
     if (!withdrawal) {
       throw new Error('Solicitud confirmada no encontrada');
     }
-    const normalizedAction = action?.toUpperCase() as ManualApprovalAction;
-    
+
     const notesParts: string[] = [];
     if (withdrawal.notes) {
       notesParts.push(withdrawal.notes);
     }
 
-    if (normalizedAction === WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.APPROVE) {
-      notesParts.push('Inspector autorizó el retiro tras confirmación del apoderado.');
+    if (action === WITHDRAWAL_CONSTANTS.MANUAL_APPROVAL_ACTION.APPROVE || action === 'DENY') {
+      notesParts.push('Inspector rechazó el retiro tras la confirmación.');
       withdrawal.status = WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.APPROVED;
     } else {
-      notesParts.push('Inspector rechazó el retiro tras la confirmación.');
+      notesParts.push('Inspector autorizó el retiro tras confirmación del apoderado.');
       withdrawal.status = WITHDRAWAL_CONSTANTS.WITHDRAWAL_STATUS.DENIED;
-       withdrawal.contactVerified = false;
     }
 
     if (comment && comment.trim().length > 0) {
