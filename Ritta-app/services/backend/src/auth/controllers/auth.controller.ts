@@ -49,6 +49,7 @@ interface IpAttemptInfo {
 const ipLoginAttempts = new Map<string, IpAttemptInfo>();
 const MAX_IP_ATTEMPTS_BEFORE_CAPTCHA = 2; 
 const IP_ATTEMPT_WINDOW_MS = 15 * 60 * 1000; 
+const CAPTCHA_EXPECTED_ACTION = 'login_modal';
 
 function recordFailedIpAttempt(ip: string): void {
   const now = Date.now();
@@ -98,7 +99,7 @@ class AuthController {
             res.status(401).json({ error: 'Verificación de seguridad requerida. Por favor, completa el CAPTCHA.' });
             return;
           }
-          const isCaptchaValid = await verifyRecaptchaV3(captchaToken, 'login_ip_triggered', clientIp);
+          const isCaptchaValid = await verifyRecaptchaV3(captchaToken, CAPTCHA_EXPECTED_ACTION, clientIp);
           if (!isCaptchaValid) {
             console.log(`IP ${clientIp} CAPTCHA v3 verification failed.`);
             recordFailedIpAttempt(clientIp);
@@ -138,7 +139,7 @@ class AuthController {
           return;
         }
         if (clientIp) { 
-          const isCaptchaValid = await verifyRecaptchaV3(captchaToken, 'login_user_triggered', clientIp); 
+          const isCaptchaValid = await verifyRecaptchaV3(captchaToken, CAPTCHA_EXPECTED_ACTION, clientIp);
           if (!isCaptchaValid) {
             recordFailedIpAttempt(clientIp); 
             res.status(401).json({ error: 'Verificación de seguridad fallida. Inténtalo de nuevo.' });

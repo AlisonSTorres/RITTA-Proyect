@@ -62,9 +62,8 @@ export default () => ({
       typedRoutes: true,
     },
     extra: {
-      recaptchaSiteKey,
-      captchaSiteKey: recaptchaSiteKey,
-      EXPO_PUBLIC_RECAPTCHA_SITE_KEY: recaptchaSiteKey,
+      recaptchaKey: process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY,
+      apiUrl: process.env.EXPO_PUBLIC_API_URL,
     },
   },
 });

@@ -27,6 +27,7 @@ npm install -g expo-cli
 # Instalar dependencias back
 cd services/backend
 npm install
+npm install axios
 .env agregar para entorno local #(Formato en este Link: )
 
 # Configuración Postgresql

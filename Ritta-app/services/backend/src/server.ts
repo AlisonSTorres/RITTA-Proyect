@@ -25,7 +25,7 @@ app.use('/api/support', supportRoutes);
 
 // Ruta simple para verificar que el servidor está vivo
 app.get('/', (req, res) => {
-  res.send('Servidor Backend T_Ing_Soft Funcionando!');
+  res.send('Servidor Backend Funcionando!');
 });
 
 // Iniciar el Servidor
