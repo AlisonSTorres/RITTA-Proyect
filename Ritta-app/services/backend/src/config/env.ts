@@ -82,12 +82,29 @@ const parseRecaptchaThreshold = (value?: string): number => {
   return parsed;
 };
 
-const rawRecaptchaSecret = process.env.RECAPTCHA_V3_SECRET_KEY;
+const recaptchaSecretEnvKeys = [
+  'RECAPTCHA_V3_SECRET_KEY',
+  'RECAPTCHA_SECRET_KEY',
+  'RECAPTCHA_PRIVATE_KEY',
+];
+
+let rawRecaptchaSecret: string | undefined;
+let recaptchaSecretSource: string | undefined;
+
+for (const key of recaptchaSecretEnvKeys) {
+  const candidate = process.env[key];
+  if (typeof candidate === 'string' && candidate.length > 0) {
+    rawRecaptchaSecret = candidate;
+    recaptchaSecretSource = key;
+    break;
+  }
+}
+
 const sanitizedRecaptchaSecret = sanitizeString(rawRecaptchaSecret);
 
 if (rawRecaptchaSecret && !sanitizedRecaptchaSecret) {
   console.warn(
-    'ADVERTENCIA: RECAPTCHA_V3_SECRET_KEY está definida pero queda vacía tras eliminar espacios. Se ignorará el valor.',
+    `ADVERTENCIA: ${recaptchaSecretSource ?? 'RECAPTCHA_V3_SECRET_KEY'} está definida pero queda vacía tras eliminar espacios. Se ignorará el valor.`,
   );
 }
 
@@ -136,8 +153,15 @@ if (!config.EMAIL_HOST || !config.EMAIL_USER || !config.EMAIL_PASS) {
 if (config.NODE_ENV === 'production' && !config.RECAPTCHA_V3_SECRET_KEY) {
     console.warn('ADVERTENCIA: RECAPTCHA_V3_SECRET_KEY no está definida en .env para producción.');
 }
-if (config.RECAPTCHA_V3_SECRET_KEY && rawRecaptchaSecret !== config.RECAPTCHA_V3_SECRET_KEY) {
-  console.info('INFO: RECAPTCHA_V3_SECRET_KEY se normalizó eliminando espacios en blanco.');
+if (config.RECAPTCHA_V3_SECRET_KEY) {
+  if (recaptchaSecretSource && recaptchaSecretSource !== 'RECAPTCHA_V3_SECRET_KEY') {
+    console.info(
+      `INFO: Usando ${recaptchaSecretSource} como fuente de la clave secreta reCAPTCHA v3. Define RECAPTCHA_V3_SECRET_KEY para evitar ambigüedad.`,
+    );
+  }
+  if (rawRecaptchaSecret && rawRecaptchaSecret !== config.RECAPTCHA_V3_SECRET_KEY) {
+    console.info('INFO: RECAPTCHA_V3_SECRET_KEY se normalizó eliminando espacios en blanco.');
+  }
 }
 
 

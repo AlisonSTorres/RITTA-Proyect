@@ -1,7 +1,7 @@
 import axios from 'axios';
 import config from '../config/env';
 
-const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api.js';
+const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 interface RecaptchaV3WebResponse {
   success: boolean;
   challenge_ts: string;
@@ -45,8 +45,9 @@ export const verifyRecaptchaV3 = async (
     if (remoteIp) {
       params.remoteip = remoteIp;
     }
-    const response = await axios.post<RecaptchaV3WebResponse>(RECAPTCHA_VERIFY_URL, null, {
-      params,
+    const formData = new URLSearchParams(params);
+
+    const response = await axios.post<RecaptchaV3WebResponse>(RECAPTCHA_VERIFY_URL, formData.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
       },
