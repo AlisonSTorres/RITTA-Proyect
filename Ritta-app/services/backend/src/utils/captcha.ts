@@ -1,8 +1,7 @@
 import axios from 'axios';
 import config from '../config/env';
 
-const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
-
+const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify?secret=${secret}&response=${token}';
 interface RecaptchaV3WebResponse {
   success: boolean;
   challenge_ts: string;
