@@ -1,5 +1,30 @@
-+69-0
-import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import dotenv from 'dotenv';
+
+const envCandidates = [
+  path.resolve(__dirname, '.env.local'),
+  path.resolve(__dirname, '.env'),
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(__dirname, '../../.env.local'),
+  path.resolve(__dirname, '../../.env'),
+];
+
+const loadedEnvFiles = new Set<string>();
+
+for (const candidate of envCandidates) {
+  if (!loadedEnvFiles.has(candidate) && fs.existsSync(candidate)) {
+    dotenv.config({ path: candidate, override: false });
+    loadedEnvFiles.add(candidate);
+  }
+}
+
+if (loadedEnvFiles.size > 0) {
+  console.info(`INFO: Variables de entorno cargadas para Expo desde: ${Array.from(loadedEnvFiles).join(', ')}`);
+} else {
+  console.warn('ADVERTENCIA: No se encontró archivo .env para la app móvil en las rutas habituales.');
+}
 
 const rawSiteKey = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY ?? '';
 const normalizedSiteKey = typeof rawSiteKey === 'string' ? rawSiteKey.trim() : '';

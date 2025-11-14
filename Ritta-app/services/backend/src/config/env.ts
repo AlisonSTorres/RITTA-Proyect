@@ -1,7 +1,31 @@
 import dotenv from 'dotenv';
+import fs from 'node:fs';
+import path from 'node:path';
 
 
-dotenv.config();
+const envCandidates = [
+  path.resolve(__dirname, '../..', '.env.local'),
+  path.resolve(__dirname, '../..', '.env'),
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(__dirname, '../../../..', '.env.local'),
+  path.resolve(__dirname, '../../../..', '.env'),
+];
+
+const loadedEnvFiles = new Set<string>();
+
+for (const candidate of envCandidates) {
+  if (!loadedEnvFiles.has(candidate) && fs.existsSync(candidate)) {
+    dotenv.config({ path: candidate, override: false });
+    loadedEnvFiles.add(candidate);
+  }
+}
+
+if (loadedEnvFiles.size > 0) {
+  console.info(`INFO: Variables de entorno cargadas desde: ${Array.from(loadedEnvFiles).join(', ')}`);
+} else {
+  console.warn('ADVERTENCIA: No se encontró ningún archivo .env en las rutas habituales.');
+}
 
 interface AppConfig {
   NODE_ENV: string;

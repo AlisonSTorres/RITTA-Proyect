@@ -22,14 +22,15 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const [rut, setRut] = useState('');
   const [password, setPassword] = useState('');
- const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [captchaVisible, setCaptchaVisible] = useState(false);
   const [captchaMessage, setCaptchaMessage] = useState<string | null>(null);
-const recaptchaSiteKey = useMemo(() => {
+  const recaptchaSiteKey = useMemo(() => {
     const candidates: unknown[] = [];
 
-    if (typeof process !== 'undefined') {
-      candidates.push(process.env?.EXPO_PUBLIC_RECAPTCHA_SITE_KEY);
+    const envValue = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY;
+    if (typeof envValue === 'string') {
+      candidates.push(envValue);
     }
 
     const expoExtra = (Constants?.expoConfig?.extra ?? {}) as Record<string, unknown>;
@@ -51,6 +52,10 @@ const recaptchaSiteKey = useMemo(() => {
       if (typeof candidate === 'string') {
         const trimmed = candidate.trim();
         if (trimmed.length > 0) {
+          const globalRecord = globalThis as Record<string, unknown>;
+          if (typeof globalRecord['EXPO_PUBLIC_RECAPTCHA_SITE_KEY'] !== 'string') {
+            globalRecord['EXPO_PUBLIC_RECAPTCHA_SITE_KEY'] = trimmed;
+          }
           return trimmed;
         }
       }
@@ -83,7 +88,7 @@ const recaptchaSiteKey = useMemo(() => {
     setIsSubmitting(true);
 
     try {
-        await login(rut.trim(), password, captchaToken);
+      await login(rut.trim(), password, captchaToken);
       setCaptchaVisible(false);
       setCaptchaMessage(null);
     } catch (error: unknown) {
@@ -109,9 +114,9 @@ const recaptchaSiteKey = useMemo(() => {
         alert('Ocurrió un error desconocido');
       }
     
-  } finally {
+    } finally {
       setIsSubmitting(false);
-  }
+    }
   }, [login, markCaptchaRequired, password, rut]);
 
   const handleLoginPress = useCallback(() => {
