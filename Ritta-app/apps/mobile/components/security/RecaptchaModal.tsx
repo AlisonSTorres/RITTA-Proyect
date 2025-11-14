@@ -51,9 +51,7 @@ const RecaptchaModal: React.FC<RecaptchaModalProps> = ({
           align-items: center;
           gap: 16px;
         }
-      </style>
-      <script type="text/javascript">
-         .status {
+      .status {
           text-align: center;
         }
         .spinner {

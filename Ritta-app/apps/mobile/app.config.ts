@@ -87,7 +87,8 @@ export default () => ({
       typedRoutes: true,
     },
     extra: {
-      recaptchaKey: process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY,
+      recaptchaSiteKey,
+      recaptchaKey: recaptchaSiteKey,
       apiUrl: process.env.EXPO_PUBLIC_API_URL,
     },
   },

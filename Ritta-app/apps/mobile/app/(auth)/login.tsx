@@ -39,10 +39,10 @@ export default function LoginScreen() {
       (globalThis as Record<string, unknown> | undefined)?.['EXPO_PUBLIC_RECAPTCHA_SITE_KEY'];
 
     candidates.push(
-      expoExtra.recaptchaSiteKey,
+      expoExtra.recaptchaKey,
       expoExtra.captchaSiteKey,
       expoExtra.EXPO_PUBLIC_RECAPTCHA_SITE_KEY,
-      manifestExtra.recaptchaSiteKey,
+      manifestExtra.recaptchaKey,
       manifestExtra.captchaSiteKey,
       manifestExtra.EXPO_PUBLIC_RECAPTCHA_SITE_KEY,
       globalEnv,
